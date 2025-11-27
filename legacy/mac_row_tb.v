@@ -31,7 +31,8 @@ mac_row #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col)) uut (
     .in_w1(in_w1),
     .in_n(in_n),
     .inst_w(inst_w),
-    .reset(reset)
+    .reset(reset),
+    .valid(valid)
 );
 
 

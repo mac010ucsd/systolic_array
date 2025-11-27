@@ -5,8 +5,10 @@
 - [X] mac row
 - [X] mac row tb 2-bit
 - [X] mac row tb 4-bit
-- [ ] mac array
-- [ ] mac array tb
+- [X] mac array
+- [X] mac array tb
+- [ ] corelet
+- [ ] core
 - [ ] etc
 
 ## notes
