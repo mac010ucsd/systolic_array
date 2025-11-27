@@ -2,8 +2,9 @@
 ## todo
 - [x] mac tile 2-4 bit switchable
 - [x] mac tile tb
-- [ ] mac row
-- [ ] mac row tb
+- [X] mac row
+- [X] mac row tb 2-bit
+- [ ] mac row tb 4-bit
 - [ ] mac array
 - [ ] mac array tb
 - [ ] etc

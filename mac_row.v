@@ -14,7 +14,7 @@ module mac_row (clk, out_s, in_w0, in_w1, in_n, valid, inst_w, reset);
 	input  [bw-1:0] in_w0; 
 	input  [bw-1:0] in_w1; 
 	input  [inst_bw-1:0] inst_w; // inst[1]:execute, inst[0]: kernel loading
-	input  [psum_bw*col-1:0] in_n;
+	input  [psum_bw*col*2-1:0] in_n;
 
 	wire  [(col+1)*bw-1:0] temp0;
 	wire  [(col+1)*bw-1:0] temp1;
@@ -24,7 +24,7 @@ module mac_row (clk, out_s, in_w0, in_w1, in_n, valid, inst_w, reset);
 	assign temp0[bw-1:0] = in_w0;
 	assign temp1[bw-1:0] = in_w1;
 
-	assign temp[2:0] = inst_w;
+	assign inst[inst_bw-1:0] = inst_w[inst_bw-1:0];
 
 	/*
 	mac_tile (clk, reset
