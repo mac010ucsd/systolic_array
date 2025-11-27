@@ -1,8 +1,8 @@
 module mac_row_tb;
 
 parameter bw = 2;
-parameter psum_bw = 9;
-parameter inst_bw = 3;
+parameter b_bw = 4;
+parameter psum_bw = 32;
 parameter col = 4;
 
 // test with 4 columns first for ease of reading
@@ -17,14 +17,14 @@ reg reset;
 // inputs
 reg [bw-1:0] in_w0;
 reg [bw-1:0] in_w1;
-reg [psum_bw*col*2-1:0] in_n;
-reg [inst_bw-1:0] inst_w;
+reg [psum_bw*col-1:0] in_n;
+reg [2:0] inst_w;
 
 // outputs
-wire [psum_bw*col*2-1:0] out_s;
+wire [psum_bw*col-1:0] out_s;
 wire [col-1:0] valid;
 
-mac_row #(bw, psum_bw, col, inst_bw) uut (
+mac_row #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col)) uut (
     .clk(clk),
     .out_s(out_s),
     .in_w0(in_w0),
@@ -35,7 +35,7 @@ mac_row #(bw, psum_bw, col, inst_bw) uut (
 );
 
 
-reg [col*2-1:0][psum_bw-1:0] out_display;
+reg [col-1:0][psum_bw-1:0] out_display;
 
 // Clock generation
 initial begin
@@ -51,7 +51,7 @@ end
 
 always @(posedge clk) begin
     $display("psum outputs:");
-    for (j = 0; j < col*2; j = j + 1) begin
+    for (j = 0; j < col; j = j + 1) begin
         $display("out_s[%0d]: %0d", j, $signed(out_display[j]));
     end
     $display("-----------------------");
@@ -120,7 +120,7 @@ initial begin
     // all weights are loaded, begin mac operations
     inst_w = 3'b010; // mode=0, exec=1, weightload=0
 
-    // pass in activations of -8 to 7 sequentially
+    // pass in activations of 0 to 15 sequentially
     for (i = 0; i < 16; i = i + 1) begin
         {in_w1, in_w0} = i;
         #10;
@@ -128,8 +128,44 @@ initial begin
 
 
     // man too tired.. just believe that it works
-    #80;
+    #40;
     
+    // Initialize inputs
+
+    reset = 1;
+    in_n = 0;
+    in_w0 = 0;
+    in_w1 = 0;
+    inst_w = 0;
+    #10;
+    reset = 0;
+
+    // CASE 1 : 4-bit mode operation
+    inst_w = 3'b101; // mode=1, exec=0, weight
+    {in_w1, in_w0} = 4'b0001;  
+    #10;
+
+    inst_w = 3'b101; 
+    {in_w1, in_w0} = 4'b1110;  // -2
+    #10;
+
+    inst_w = 3'b101;
+    {in_w1, in_w0} = 4'b0111; // 7
+    #10;
+    
+    inst_w = 3'b101;
+    {in_w1, in_w0} = 4'b1000; // -8
+    #10;
+    
+
+    // pass in activations of 0 to 15 sequentially
+    for (i = 0; i < 16; i = i + 1) begin
+        {in_w1, in_w0} = i;
+        #10;
+    end
+
+    #40;
+
     $finish;
 end
 

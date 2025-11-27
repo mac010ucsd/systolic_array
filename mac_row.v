@@ -3,28 +3,29 @@
 module mac_row (clk, out_s, in_w0, in_w1, in_n, valid, inst_w, reset);
 
 	parameter bw = 2;
-	parameter psum_bw = 9;
+	parameter b_bw = 4;
+	parameter psum_bw = 32;
 	parameter col = 8;
-	parameter inst_bw = 3;
+
 
 	input  clk, reset;
 	// out_s for dual psum output
-	output [psum_bw*col*2-1:0] out_s;
+	output [psum_bw*col-1:0] out_s;
 	output [col-1:0] valid;
 	input  [bw-1:0] in_w0; 
 	input  [bw-1:0] in_w1; 
-	input  [inst_bw-1:0] inst_w; // inst[1]:execute, inst[0]: kernel loading
-	input  [psum_bw*col*2-1:0] in_n;
+	input  [2:0] inst_w; // inst[1]:execute, inst[0]: kernel loading
+	input  [psum_bw*col-1:0] in_n;
 
 	wire  [(col+1)*bw-1:0] temp0;
 	wire  [(col+1)*bw-1:0] temp1;
 	
-	wire  [(col+1)*inst_bw-1:0] inst;
+	wire  [(col+1)*3-1:0] inst;
 	
 	assign temp0[bw-1:0] = in_w0;
 	assign temp1[bw-1:0] = in_w1;
 
-	assign inst[inst_bw-1:0] = inst_w[inst_bw-1:0];
+	assign inst[2:0] = inst_w[2:0];
 
 	/*
 	mac_tile (clk, reset
@@ -41,7 +42,7 @@ module mac_row (clk, out_s, in_w0, in_w1, in_n, valid, inst_w, reset);
 
 	genvar i;
 	for (i=0; i < col; i=i+1) begin : col_num
-		mac_tile #(.bw(bw), .psum_bw(psum_bw)) mac_tile_instance (
+		mac_tile #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw)) mac_tile_instance (
 			.clk(clk),
 			.reset(reset),
 			.in_w0(temp0[bw*(i+1)-1:bw*i]),
@@ -51,17 +52,15 @@ module mac_row (clk, out_s, in_w0, in_w1, in_n, valid, inst_w, reset);
 
 			// fix below? is this fine??
 			// in this manner, we can have entire psum row output right???
-			.in_n0(in_n[psum_bw*(2*i+1)-1:psum_bw*i*2]),
-			.in_n1(in_n[psum_bw*(2*i+2)-1:psum_bw*(2*i+1)]),
-			.out_s0(out_s[psum_bw*(2*i+1)-1:psum_bw*i*2]),
-			.out_s1(out_s[psum_bw*(2*i+2)-1:psum_bw*(2*i+1)]),
+			.in_n(in_n[psum_bw*(i+1)-1:psum_bw*i]),
+			.out_s(out_s[psum_bw*(i+1)-1:psum_bw*i]),
 			
 			// this is fine
-			.inst_w(inst[inst_bw*(i+1)-1:inst_bw*i]),
-			.inst_e(inst[inst_bw*(i+2)-1:inst_bw*(i+1)]));
+			.inst_w(inst[3*(i+1)-1:3*i]),
+			.inst_e(inst[3*(i+2)-1:3*(i+1)]));
 			// valid is the exec bit passing through. -1 = mode -2 = exec
 		// valid flag when the dual psum is ready.
-		assign valid[i] = inst[inst_bw*(i+2)-2];
+		assign valid[i] = inst[3*(i+2)-2];
 	end
 
 endmodule

@@ -1,4 +1,5 @@
-./mac.v
 ./mac_tile.v
 ./mac_row_tb.v
 ./mac_row.v
+./basic/adder.v 
+./basic/mult.v 
