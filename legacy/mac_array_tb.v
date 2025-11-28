@@ -36,7 +36,7 @@ reg [col-1:0][psum_bw-1:0] out_display;
 // Clock generation
 initial begin
     clk = 0;
-    forever #5 clk = ~clk; // 10 time units clock period
+    forever #1 clk = ~clk; // 10 time units clock period
 end
 
 integer j;
@@ -67,7 +67,7 @@ initial begin
     in_n = 0;
     in_w = 0;
     inst_w = 0;
-    #10;
+    #2;
     reset = 0;
 
     // CASE 1 : 2-bit mode operation
@@ -77,22 +77,22 @@ initial begin
 
     inst_w = 3'b001; // mode=0, exec=0, weight
 
-    #10
+    #2
 
     in_w = {4'b0, 4'b0111}; // weights for row0 top half, row1 top half
-    #10;
+    #2;
 
     in_w = {4'b0101, 4'b0110}; // weights for row0 low half, row1 low half
-    #10;
+    #2;
 
     in_w = {4'b0100, 4'b1011}; 
-    #10;
+    #2;
 
     in_w = {4'b1001, 4'b1010}; 
-    #10;
+    #2;
 
     in_w = {4'b1000, 4'b0}; 
-    #10;
+    #2;
 
 
     /* weights should look like:
@@ -106,50 +106,50 @@ initial begin
     // test unit for 1 input timestep
     
     // should take 1 extra cycle to load in
-    #10;
+    #2;
 
     // all weights are loaded, begin mac operations
     inst_w = 3'b010; // mode=0, exec=1, weightload=0
 
-    #10;
+    #2;
     // want to leave inst_w for the length of NIJ cycles. in this case NIJ=1
     inst_w = 3'b000;
 
     in_w = {4'b0, 4'b1111};
-    #10;
+    #2;
 
     in_w = {4'b1111, 4'b0000};
-    #10;
+    #2;
 
     // works fine in 2-bit mode.
 
     // 4-bit mode test
 
-    #20;
+    #4;
 
     reset = 1;
-    #10
+    #2
     reset = 0;
     inst_w = 3'b101; // mode=1, exec=0, weightload=1
-    #10;
+    #2;
 
     in_w = {4'b0, 4'b0111};
-    #10;
+    #2;
     in_w = {4'b0101, 4'b1011};
-    #10;
+    #2;
     in_w = {4'b1001, 4'b0};
     inst_w = 3'b110;
 
-    #10;
+    #2;
 
     inst_w = 3'b100;
     in_w = {4'b0, 4'b1111};
-    #10;
+    #2;
 
     in_w = {4'b1111, 4'b0000};
-    #10;
+    #2;
 
-    #20;
+    #4;
     // expected psum = (5+7)*(15) = 180, -180
     // works!!!
 

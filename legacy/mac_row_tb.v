@@ -35,7 +35,6 @@ mac_row #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col)) uut (
     .valid(valid)
 );
 
-
 reg [col-1:0][psum_bw-1:0] out_display;
 
 // Clock generation

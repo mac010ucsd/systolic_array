@@ -114,8 +114,8 @@ always@(posedge clk) begin
 			end
 		end
 	 	if ((inst_w[2] == 1'b1) && (inst_w[0] == 1'b1) && (load_ready_q == 2'b11)) begin // 1 mode = 4bit mode, load weights into both simultaneously.
-			b_q0<={in_w1, in_w0};
-			b_q1<={in_w1, in_w0};
+			b_q0 <= {in_w1, in_w0};
+			b_q1 <= {in_w1, in_w0};
 			load_ready_q <= 2'b00;
 		end
 		
