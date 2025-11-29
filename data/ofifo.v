@@ -23,7 +23,10 @@ genvar i;
 
 assign o_ready = ~o_full;
 assign o_full  = |full;
-assign o_valid = ~(|empty);
+assign o_valid = !rempty;
+
+wire rempty;
+assign rempty = |empty;
 
 for (i=0; i<col ; i=i+1) begin : col_num
 	fifo_depth64 #(.bw(bw)) fifo_instance (

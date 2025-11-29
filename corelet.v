@@ -3,7 +3,7 @@ corelet.v is just a wrapper that includes all blocks you designed so far (L0/Inp
 FIFO, OFIFO, MAC Array, SFP?).    
 */
 
-module corelet (clk, reset, in, out, inst, valid);
+module corelet (clk, reset, in, out, inst, valid, ofifo_rd);
 parameter bw = 2;
 parameter b_bw = 4;
 parameter psum_bw = 32;
@@ -15,6 +15,7 @@ input [4:0] inst; // [wr][mode][exec][weightload]
 input [row*bw*2-1:0] in; // from input sram
 output [psum_bw*col-1:0] out; // to output sram
 output valid;
+input ofifo_rd;
 
 wire l0_wr;
 wire l0_rd;
@@ -24,7 +25,7 @@ wire mode;
 
 // wire ofifo_valid;
 
-assign valid = ofifo_ready_delay_2;
+assign valid = o_valid; // ofifo_ready_delay;
 reg ofifo_ready_delay_2;
 always @(posedge clk) begin
     if (reset)
@@ -33,8 +34,8 @@ always @(posedge clk) begin
         ofifo_ready_delay_2 <= ofifo_ready_delay;
 end
 
-assign l0_rd = inst[4];
-assign l0_wr = inst[3];
+assign l0_rd = inst[4]; // from l0 to mac array
+assign l0_wr = inst[3]; // from SRAM to l0
 assign mode = inst[2];
 assign exec = inst[1];
 assign weightload = inst[0];
@@ -116,16 +117,18 @@ always @(posedge clk) begin
         ofifo_ready_delay <= ofifo_rd;
 end
 
+wire o_valid;
+
 ofifo #(.col(col), .bw(psum_bw)) ofifo_instance (
     .clk(clk),
     .reset(reset),
     .in(mac_out),      // connect to mac array
     .out(out), // connect to sram
-    .rd(ofifo_ready_delay),   // ofifo_rd       // can start reading the moment o_valid is high
-    .wr(mac_out_ready),      // connect to mac array
+    .rd(ofifo_rd),   // ofifo_rd       // can start reading the moment o_valid is high
+    .wr(mac_valid),      // connect to mac array
     .o_full(),      // not needed
     .o_ready(),     // not needed
-    .o_valid(ofifo_rd));    // valid if ALL col have output (1 whole row). but this is already checked in ofifo?
+    .o_valid(o_valid));    // valid if ALL col have output (1 whole row). but this is already checked in ofifo?
 
 // ignore sfu for now.
 // ofifo ready needs to be delayed...

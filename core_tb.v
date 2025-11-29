@@ -10,7 +10,7 @@ parameter len_kij = 9;
 parameter len_onij = 16;
 parameter col = 8;
 parameter row = 8;
-parameter len_nij = 36;
+parameter len_nij = 16; // 36?
 
 reg clk = 0;
 reg reset = 1;
@@ -40,6 +40,10 @@ reg execute_q = 0;
 reg load_q = 0;
 reg acc_q = 0;
 reg acc = 0;
+reg mode;
+reg mode_q = 0;
+reg sel = 0;
+reg sel_q = 0;
 
 reg [1:0]  inst_w; 
 reg [bw*row-1:0] D_xmem;
@@ -81,14 +85,18 @@ assign inst_q[2]   = l0_wr_q;
 assign inst_q[1]   = execute_q; 
 assign inst_q[0]   = load_q; 
 
+reg [col-1:0][psum_bw-1:0] sfp_out_q; // just for testing
+reg ofifo_valid_q;
 
-core  #(.bw(bw), .col(col), .row(row)) core_instance (
+core  #(.col(col), .row(row), .psum_bw(psum_bw)) core_instance (
 	.clk(clk), 
 	.inst(inst_q),
 	.ofifo_valid(ofifo_valid),
 	.D_xmem(D_xmem_q), 
 	.sfp_out(sfp_out), 
-	.reset(reset)); 
+	.mode(mode_q),
+	.reset(reset),
+	.sel(sel_q)); 
 
 
 initial begin 
@@ -105,6 +113,7 @@ initial begin
 	l0_wr    = 0;
 	execute  = 0;
 	load     = 0;
+	mode	 = 1;
 
 	$dumpfile("core_tb.vcd");
 	$dumpvars(0,core_tb);
@@ -133,7 +142,9 @@ initial begin
 
 	/////// Activation data writing to memory ///////
 	for (t=0; t<len_nij; t=t+1) begin  
-		#0.5 clk = 1'b0;  x_scan_file = $fscanf(x_file,"%32b", D_xmem); WEN_xmem = 0; CEN_xmem = 0; if (t>0) A_xmem = A_xmem + 1;
+		#0.5 clk = 1'b0;  x_scan_file = $fscanf(x_file,"%32b", D_xmem); 
+		WEN_xmem = 0; CEN_xmem = 0; 
+		if (t>0) A_xmem = A_xmem + 1;
 		#0.5 clk = 1'b1;   
 	end
 
@@ -144,18 +155,18 @@ initial begin
 	/////////////////////////////////////////////////
 
 
-	for (kij=0; kij<9; kij=kij+1) begin  // kij loop
+	for (kij=0; kij<1; kij=kij+1) begin  // kij loop
 
 		case(kij)
-		 0: w_file_name = "weight_itile0_otile0_kij0.txt";
-		 1: w_file_name = "weight_itile0_otile0_kij1.txt";
-		 2: w_file_name = "weight_itile0_otile0_kij2.txt";
-		 3: w_file_name = "weight_itile0_otile0_kij3.txt";
-		 4: w_file_name = "weight_itile0_otile0_kij4.txt";
-		 5: w_file_name = "weight_itile0_otile0_kij5.txt";
-		 6: w_file_name = "weight_itile0_otile0_kij6.txt";
-		 7: w_file_name = "weight_itile0_otile0_kij7.txt";
-		 8: w_file_name = "weight_itile0_otile0_kij8.txt";
+			0: w_file_name = "weight_itile0_otile0_kij0.txt";
+			1: w_file_name = "weight_itile0_otile0_kij1.txt";
+			2: w_file_name = "weight_itile0_otile0_kij2.txt";
+			3: w_file_name = "weight_itile0_otile0_kij3.txt";
+			4: w_file_name = "weight_itile0_otile0_kij4.txt";
+			5: w_file_name = "weight_itile0_otile0_kij5.txt";
+			6: w_file_name = "weight_itile0_otile0_kij6.txt";
+			7: w_file_name = "weight_itile0_otile0_kij7.txt";
+			8: w_file_name = "weight_itile0_otile0_kij8.txt";
 		endcase
 		
 
@@ -179,16 +190,13 @@ initial begin
 		#0.5 clk = 1'b0;   
 		#0.5 clk = 1'b1;   
 
-
-
-
-
 		/////// Kernel data writing to memory ///////
 
 		A_xmem = 11'b10000000000;
 
 		for (t=0; t<col; t=t+1) begin  
-			#0.5 clk = 1'b0;  w_scan_file = $fscanf(w_file,"%32b", D_xmem); WEN_xmem = 0; CEN_xmem = 0; if (t>0) A_xmem = A_xmem + 1; 
+			#0.5 clk = 1'b0;  w_scan_file = $fscanf(w_file,"%32b", D_xmem); 
+			WEN_xmem = 0; CEN_xmem = 0; if (t>0) A_xmem = A_xmem + 1; 
 			#0.5 clk = 1'b1;  
 		end
 
@@ -199,15 +207,43 @@ initial begin
 
 
 		/////// Kernel data writing to L0 ///////
-		...
+		A_xmem = 11'b10000000000;
+
+		for (t=0; t<col; t=t+1) begin
+			#0.5 clk = 0;
+			l0_wr = 1;
+			CEN_xmem = 0;
+			if (t>0) A_xmem = A_xmem + 1;
+			#0.5 clk = 1;
+		end
+
+		#0.5 clk = 1'b0;  CEN_xmem = 1; l0_wr = 0;
+		#0.5 clk = 1'b1; 
 		/////////////////////////////////////
 
 
 
 		/////// Kernel loading to PEs ///////
-		...
+		// should take roughly 2col+1 to propagate to end
+		// so row+2col+1 to propagate to bottom right corner.
+		// just trust that it works.
+		
 		/////////////////////////////////////
-	
+
+		// only 8 (#col) number of "loads" need to be sent
+		// but it's fine if we send more as they just won't be used.
+		for (t=0; t<row+col; t=t+1) begin
+			#0.5 clk = 0;
+			mode = 1;
+			if (t >= col) begin
+				l0_rd = 1;
+				load = 0;
+			end else begin
+				l0_rd = 1;
+				load = 1;
+			end
+			#0.5 clk = 1;
+		end
 
 
 		////// provide some intermission to clear up the kernel loading ///
@@ -221,16 +257,52 @@ initial begin
 		end
 		/////////////////////////////////////
 
-
+		// I AM SURE EVERYTHING ABOVE THIS POINT IS FINE!!!
 
 		/////// Activation data writing to L0 ///////
-		...
+		A_xmem = 11'b00000000000;
+
+		// 110 ns - 0.5 here.
+
+		for (t=0; t<len_nij; t=t+1) begin
+			#0.5 clk = 0;
+			l0_wr = 1;
+			CEN_xmem = 0;
+			if (t>0) A_xmem = A_xmem + 1;
+			#0.5 clk = 1;
+		end
+		
+		// 16 cycles
+
+		#0.5 clk = 1'b0;  CEN_xmem = 1; A_xmem = 0;
+		l0_wr = 0;
+		#0.5 clk = 1'b1; 
+
 		/////////////////////////////////////
 
 
 
 		/////// Execution ///////
-		...
+		// enable operations for nij cycles
+		// simultaneously, enable l0_rd for nij+col cycles.
+		for (t=0; t<len_nij+col; t=t+1) begin
+			#0.5 clk = 0;
+			if (t < len_nij) 
+				execute = 1;		
+			else 
+				execute = 0;
+			l0_rd = 1;
+			mode = 1;
+			#0.5 clk = 1;
+		end
+
+		#0.5 clk = 1'b0;  
+		l0_rd = 0;
+		mode = 1;
+		execute = 0;
+		#0.5 clk = 1'b1; 
+
+		// #20;
 		/////////////////////////////////////
 
 
@@ -238,13 +310,96 @@ initial begin
 		//////// OFIFO READ ////////
 		// Ideally, OFIFO should be read while execution, but we have enough ofifo
 		// depth so we can fetch out after execution.
-		...
+		
+		A_pmem = 11'b00000000000;
+		sel = kij[0];
+
+		// enable ofifo reading one cycle early
+		for (t=0; t<1; t=t+1) begin
+			#0.5 clk = 0;
+			ofifo_rd = 1;
+			#0.5 clk = 1;
+		end
+
+		for (t=0; t<len_nij; t=t+1) begin  
+			#0.5 clk = 1'b0; 
+			WEN_pmem = 0; CEN_pmem = 0; 
+			if (t>0) A_pmem = A_pmem + 1; 
+			#0.5 clk = 1'b1;  
+		end
+
+		#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0; ofifo_rd = 0;
+		#0.5 clk = 1'b1; 
+				#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
+		#0.5 clk = 1'b1; 
+				#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
+		#0.5 clk = 1'b1; 
+
+		// read mem to test.
+		// takes 4 cycles to propagate
+
+
+		A_pmem = 0;
+
+	/*
+		for (t=0; t<1; t=t+1) begin
+			#0.5 clk = 0;
+			CEN_pmem = 0;
+			#0.5 clk = 1;
+		end
+	*/
+
+		A_pmem = 0;
+		for (t=0; t<len_nij+4; t=t+1) begin
+			#0.5 clk = 0;
+			if (t>0) A_pmem = A_pmem + 1;
+			/*
+			if (t < len_nij-4) CEN_pmem = 0;
+			else CEN_pmem = 1;
+			*/
+			CEN_pmem = 0;
+			$display("psum outputs: %0d", t);
+			for (j = 0; j < col; j = j + 1) begin
+				$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
+				// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
+			end
+			$display("-----------------------");
+			#0.5 clk = 1;
+		end
+
+		/*
+		// takes 4 cycles for ofifo 'rd' to propagate (to our visuals)
+		for (t=0; t<4; t=t+1) begin
+			#0.5 clk = 0;
+			ofifo_rd = 1;
+			#0.5 clk = 1;
+		end
+
+
+		for (t=0; t<len_nij; t=t+1) begin
+			#0.5 clk = 0;
+			ofifo_rd = 1;
+			$display("psum outputs: %0d %b", t, ofifo_valid_q);
+			for (j = 0; j < col; j = j + 1) begin
+				$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
+			end
+			$display("-----------------------");
+			#0.5 clk = 1;
+		end
+
+		#0.5 clk = 1'b0;  
+		ofifo_rd = 0;
+		#0.5 clk = 1'b1; 
+
+		*/
+
 		/////////////////////////////////////
 
 
 	end  // end of kij loop
 
 
+/*
 	////////// Accumulation /////////
 	out_file = $fopen("out.txt", "r");  
 
@@ -311,6 +466,16 @@ initial begin
 		#0.5 clk = 1'b1;  
 	end
 
+*/
+
+	
+	for (t=0; t<len_nij; t=t+1) begin
+		#0.5 clk = 0;
+		ofifo_rd = 1;
+
+		#0.5 clk = 1;
+	end
+	
 	#10 $finish;
 
 end
@@ -332,6 +497,10 @@ always @ (posedge clk) begin
 	l0_wr_q    <= l0_wr ;
 	execute_q  <= execute;
 	load_q     <= load;
+	mode_q 	<= mode;
+	sfp_out_q <= sfp_out;
+	ofifo_valid_q <= ofifo_valid;
+	sel_q <= sel;
 end
 
 

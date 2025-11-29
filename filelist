@@ -11,4 +11,7 @@
 ./data/ofifo.v
 ./data/sram_32b_w2048.v
 ./corelet.v
-./corelet_tb.v
+./core.v
+./core_tb.v
+./data/sfu.v
+./data/sram_bank_32b_w2048.v

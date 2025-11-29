@@ -67,10 +67,13 @@ assign out_s1 = inst_q[2] ? {big_psum[10:8], 6'b0} : mac_output1[psum_bw-1:0];
 // (inst_q[2] ? (mult_output1 << 2) : mult_output1)
 
 assign out_s = inst_q[2] ?
-	(c_q + {{(psum_bw-b_bw-bw){mult_output0[b_bw+bw-1]}}, mult_output0} +
- 	{{(psum_bw-b_bw-bw-2){mult_output1[b_bw+bw-1]}}, mult_output1, 2'b00}) : 
+	(c_q + prod) : 
 	(c_q + {{(psum_bw-b_bw-bw){mult_output0[b_bw+bw-1]}}, mult_output0} +
  	{{(psum_bw-b_bw-bw){mult_output1[b_bw+bw-1]}}, mult_output1});
+
+wire [psum_bw-1:0] prod;
+assign prod = {{(psum_bw-b_bw-bw){mult_output0[b_bw+bw-1]}}, mult_output0} +
+ 	{{(psum_bw-b_bw-bw-2){mult_output1[b_bw+bw-1]}}, mult_output1, 2'b00};
 
 mult #(.a_bw(bw), .b_bw(b_bw), .out_bw(bw+b_bw)) mult_instance0 (
         .a(a_q0), 
