@@ -10,7 +10,7 @@ parameter len_kij = 9;
 parameter len_onij = 16;
 parameter col = 8;
 parameter row = 8;
-parameter len_nij = 36; 
+parameter len_nij = 36; // 36?
 parameter nij_sz = 6;
 
 reg clk = 0;
@@ -120,7 +120,7 @@ initial begin
 	$dumpfile("core_tb.vcd");
 	$dumpvars(0,core_tb);
 
-	x_file = $fopen("activation_tile0_2b.txt", "r");
+	x_file = $fopen("activation_tile0.txt", "r");
 	// Following three lines are to remove the first three comment lines of the file
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
@@ -160,15 +160,15 @@ initial begin
 	for (kij=0; kij<9; kij=kij+1) begin  // kij loop
 
 		case(kij)
-			0: w_file_name = "weight_itile0_otile0_kij0_2b.txt";
-			1: w_file_name = "weight_itile0_otile0_kij1_2b.txt";
-			2: w_file_name = "weight_itile0_otile0_kij2_2b.txt";
-			3: w_file_name = "weight_itile0_otile0_kij3_2b.txt";
-			4: w_file_name = "weight_itile0_otile0_kij4_2b.txt";
-			5: w_file_name = "weight_itile0_otile0_kij5_2b.txt";
-			6: w_file_name = "weight_itile0_otile0_kij6_2b.txt";
-			7: w_file_name = "weight_itile0_otile0_kij7_2b.txt";
-			8: w_file_name = "weight_itile0_otile0_kij8_2b.txt";
+			0: w_file_name = "weight_itile0_otile0_kij0.txt";
+			1: w_file_name = "weight_itile0_otile0_kij1.txt";
+			2: w_file_name = "weight_itile0_otile0_kij2.txt";
+			3: w_file_name = "weight_itile0_otile0_kij3.txt";
+			4: w_file_name = "weight_itile0_otile0_kij4.txt";
+			5: w_file_name = "weight_itile0_otile0_kij5.txt";
+			6: w_file_name = "weight_itile0_otile0_kij6.txt";
+			7: w_file_name = "weight_itile0_otile0_kij7.txt";
+			8: w_file_name = "weight_itile0_otile0_kij8.txt";
 		endcase
 		
 
@@ -385,7 +385,7 @@ initial begin
 	#0.5 clk = 1'b1;
 
 	CEN_pmem = 1;
-	out_file = $fopen("out_2b.txt", "r");  
+	out_file = $fopen("out.txt", "r");  
 
 	// Following three lines are to remove the first three comment lines of the file
 	out_scan_file = $fscanf(out_file,"%s", answer); 
@@ -433,7 +433,7 @@ initial begin
 
 /*
 	////////// Accumulation /////////
-	out_file = $fopen("out_2b.txt", "r");  
+	out_file = $fopen("out.txt", "r");  
 
 	// Following three lines are to remove the first three comment lines of the file
 	out_scan_file = $fscanf(out_file,"%s", answer); 
