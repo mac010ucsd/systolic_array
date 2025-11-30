@@ -191,4 +191,23 @@ sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd (
 	.Q(o_pmem_odd)
 );
 
+
+// when accumulating,
+// read from one sram bank 							index 0		cycle 0
+// accumulate with ofifo										cycle 1
+// write to the same index in the other bank		index 0		cycle 2
+
+// very end
+// OC = 0
+// 324 nijs = 36 (nij) x 9 (kernels)
+/*
+....
+
+OC = 7
+36 nij x 9 kernels
+
+kij = 0 will have nij 0-35
+0 	37 	74 	114 	151 		188 	228 	265 	302
+0 36+1 72+2 108+2+4	144+2+4+1	
+*/
 endmodule

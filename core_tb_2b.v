@@ -12,6 +12,7 @@ parameter col = 8;
 parameter row = 8;
 parameter len_nij = 36; 
 parameter nij_sz = 6;
+parameter onij_sz = 4;
 
 reg clk = 0;
 reg reset = 1;
@@ -387,7 +388,7 @@ initial begin
 	// +1 on the end to make sure terminates
 	for (t=0; t<len_onij+4; t=t+1) begin
 		#0.5 clk = 0;
-		A_pmem = (t/4)*6 + t%4;
+		A_pmem = (t/onij_sz)*nij_sz + t%onij_sz;
 		
 
 		CEN_pmem = 0;
@@ -422,7 +423,7 @@ initial begin
 	// +4 useless cycles for it to propagate back to our visual 
 	for (t=0; t<len_onij+4; t=t+1) begin
 		#0.5 clk = 0;
-		A_pmem = (t/4)*6 + t%4;
+		A_pmem = (t/onij_sz)*nij_sz + t%onij_sz;
 		
 
 		CEN_pmem = 0;

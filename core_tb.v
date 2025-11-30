@@ -12,6 +12,7 @@ parameter col = 8;
 parameter row = 8;
 parameter len_nij = 36; // 36?
 parameter nij_sz = 6;
+parameter onij_sz = 4;
 
 reg clk = 0;
 reg reset = 1;
@@ -327,7 +328,6 @@ initial begin
 
 		A_pmem = 11'b00000000000 - (kij % 3 + (kij / 3) * nij_sz);
 
-
 		for (t=0; t<len_nij; t=t+1) begin  
 			#0.5 clk = 1'b0; 
 			/* // we don't need to stop ofifo rd as ofifo will automatically stop reading
@@ -362,7 +362,7 @@ initial begin
 	// +1 on the end to make sure terminates
 	for (t=0; t<len_onij+4; t=t+1) begin
 		#0.5 clk = 0;
-		A_pmem = (t/4)*6 + t%4;
+		A_pmem = (t/onij_sz)*nij_sz + t%onij_sz;
 		
 		/*
 		if (t < len_nij-4) CEN_pmem = 0;
@@ -400,7 +400,7 @@ initial begin
 	// +4 useless cycles for it to propagate back to our visual 
 	for (t=0; t<len_onij+4; t=t+1) begin
 		#0.5 clk = 0;
-		A_pmem = (t/4)*6 + t%4;
+		A_pmem = (t/onij_sz)*nij_sz + t%onij_sz;
 		
 		/*
 		if (t < len_nij-4) CEN_pmem = 0;
@@ -410,9 +410,9 @@ initial begin
 		if (t>=4) begin
 			out_scan_file = $fscanf(out_file,"%128b", answer); // reading from out file to answer
 			if (sfp_out_q == answer)
-				$display("%2d-th output featuremap Data matched! :D %0d", t, A_pmem); 
+				$display("%2d-th output featuremap Data matched! :D %0d", t-4, A_pmem-4); 
 			else begin
-				$display("%2d-th output featuremap Data ERROR!! %0d", t, A_pmem); 
+				$display("%2d-th output featuremap Data ERROR!! %0d", t-4, A_pmem-4); 
 				$display("sfpout: %128b", sfp_out_q);
 				$display("answer: %128b", answer);
 				error = 1;
