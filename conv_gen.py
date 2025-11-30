@@ -110,3 +110,28 @@ tensor([[ -841,   108,  -367,  -164,  -677,  -677,  -362,  -425],
 
 
 '''
+
+P = output.flatten(1,2).T
+
+z = lambda x: ("{0:016b}".format(x) if x >= 0 else "1{0:015b}".format(2**15+x))
+
+# W[:,:,0] = (torch.arange((8*8))%16 - 8).reshape(8,8)
+
+# W = w_tile[tile_id,:,:,kij]  # w_tile[tile_num, array col num, array row num, kij]
+
+bit_precision = 16
+file = open(f'out.txt', 'w') #write to file
+
+file.write('#time0row7[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
+file.write('#time1row7[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
+file.write('#................#\n')
+for j in range(P.size(0)): # per row
+    for i in range(P.size(1)):  # per col
+        W_bin = z(round(P[j,7-i].item())) # reverse IC
+        for k in range(bit_precision):
+            file.write(W_bin[k])        
+        #file.write(' ')  # for visibility with blank between words, you can use
+    file.write('\n')
+file.close() #close file   
+
+# print(W.shape)

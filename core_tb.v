@@ -340,9 +340,12 @@ initial begin
 			#0.5 clk = 1'b1;  
 		end
 
+
 		#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0; ofifo_rd = 0;
 		#0.5 clk = 1'b1; 
-				#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
+			#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
+			A_pmem = 0;
+			acc = 0; // earliest time to disable acc
 		#0.5 clk = 1'b1; 
 				#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
 		#0.5 clk = 1'b1; 
@@ -351,7 +354,8 @@ initial begin
 		// takes 4 cycles to propagate
 
 
-		A_pmem = 0;
+
+
 
 	/*
 		for (t=0; t<1; t=t+1) begin
@@ -384,6 +388,10 @@ initial begin
 		*/
 	end  // end of kij loop
 
+
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+
 	A_pmem = 0;
 	// +4 useless cycles for it to propagate back to our visual 
 	// +1 on the end to make sure terminates
@@ -396,7 +404,7 @@ initial begin
 		else CEN_pmem = 1;
 		*/
 		CEN_pmem = 0;
-		$display("psum outputs: %0d", t);
+		$display("psum outputs: %0d", t, A_pmem);
 		for (j = 0; j < col; j = j + 1) begin
 			$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
 			// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
@@ -405,7 +413,58 @@ initial begin
 		#0.5 clk = 1;
 	end
 
+	
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+
 	CEN_pmem = 1;
+	out_file = $fopen("out.txt", "r");  
+
+	// Following three lines are to remove the first three comment lines of the file
+	out_scan_file = $fscanf(out_file,"%s", answer); 
+	out_scan_file = $fscanf(out_file,"%s", answer); 
+	out_scan_file = $fscanf(out_file,"%s", answer); 
+
+	error = 0;
+
+	$display("############ Verification Start #############"); 
+
+	A_pmem = 0;
+	// +4 useless cycles for it to propagate back to our visual 
+	for (t=0; t<len_onij+4; t=t+1) begin
+		#0.5 clk = 0;
+		A_pmem = (t/4)*6 + t%4;
+		
+		/*
+		if (t < len_nij-4) CEN_pmem = 0;
+		else CEN_pmem = 1;
+		*/
+		CEN_pmem = 0;
+		if (t>=4) begin
+			out_scan_file = $fscanf(out_file,"%128b", answer); // reading from out file to answer
+			if (sfp_out_q == answer)
+				$display("%2d-th output featuremap Data matched! :D %0d", t, A_pmem); 
+			else begin
+				$display("%2d-th output featuremap Data ERROR!! %0d", t, A_pmem); 
+				$display("sfpout: %128b", sfp_out_q);
+				$display("answer: %128b", answer);
+				error = 1;
+			 end
+		$display("-----------------------");
+		end
+		#0.5 clk = 1;
+	end
+	
+	if (error == 0) begin
+		$display("############ No error detected ##############"); 
+		$display("########### Project Completed !! ############"); 
+
+	end
+	/// verification start
+
+
 
 /*
 	////////// Accumulation /////////
