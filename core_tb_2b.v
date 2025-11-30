@@ -2,7 +2,7 @@
 // Please do not spread this code without permission 
 `timescale 1ns/1ps
 
-module core_tb;
+module core_tb_2b;
 
 parameter bw = 4;
 parameter psum_bw = 16;
@@ -10,7 +10,7 @@ parameter len_kij = 9;
 parameter len_onij = 16;
 parameter col = 8;
 parameter row = 8;
-parameter len_nij = 36; // 36?
+parameter len_nij = 36; 
 parameter nij_sz = 6;
 
 reg clk = 0;
@@ -114,13 +114,13 @@ initial begin
 	l0_wr    = 0;
 	execute  = 0;
 	load     = 0;
-	mode	 = 1;
+	mode	 = 0;
 	acc = 0;
 
-	$dumpfile("core_tb.vcd");
-	$dumpvars(0,core_tb);
+	$dumpfile("core_tb_2b.vcd");
+	$dumpvars(0,core_tb_2b);
 
-	x_file = $fopen("activation_tile0.txt", "r");
+	x_file = $fopen("activation2_tile0.txt", "r");
 	// Following three lines are to remove the first three comment lines of the file
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
@@ -158,17 +158,17 @@ initial begin
 
 
 	for (kij=0; kij<9; kij=kij+1) begin  // kij loop
-
+		$display(kij);
 		case(kij)
-			0: w_file_name = "weight_itile0_otile0_kij0.txt";
-			1: w_file_name = "weight_itile0_otile0_kij1.txt";
-			2: w_file_name = "weight_itile0_otile0_kij2.txt";
-			3: w_file_name = "weight_itile0_otile0_kij3.txt";
-			4: w_file_name = "weight_itile0_otile0_kij4.txt";
-			5: w_file_name = "weight_itile0_otile0_kij5.txt";
-			6: w_file_name = "weight_itile0_otile0_kij6.txt";
-			7: w_file_name = "weight_itile0_otile0_kij7.txt";
-			8: w_file_name = "weight_itile0_otile0_kij8.txt";
+			0: w_file_name = "weight2_itile0_otile0_kij0.txt";
+			1: w_file_name = "weight2_itile0_otile0_kij1.txt";
+			2: w_file_name = "weight2_itile0_otile0_kij2.txt";
+			3: w_file_name = "weight2_itile0_otile0_kij3.txt";
+			4: w_file_name = "weight2_itile0_otile0_kij4.txt";
+			5: w_file_name = "weight2_itile0_otile0_kij5.txt";
+			6: w_file_name = "weight2_itile0_otile0_kij6.txt";
+			7: w_file_name = "weight2_itile0_otile0_kij7.txt";
+			8: w_file_name = "weight2_itile0_otile0_kij8.txt";
 		endcase
 		
 
@@ -193,10 +193,10 @@ initial begin
 		#0.5 clk = 1'b1;   
 
 		/////// Kernel data writing to memory ///////
-
+		// must modify for 2b as kernel is twice sized (2col)
 		A_xmem = 11'b10000000000;
 
-		for (t=0; t<col; t=t+1) begin  
+		for (t=0; t<2*col; t=t+1) begin  
 			#0.5 clk = 1'b0;  w_scan_file = $fscanf(w_file,"%32b", D_xmem); 
 			WEN_xmem = 0; CEN_xmem = 0; if (t>0) A_xmem = A_xmem + 1; 
 			#0.5 clk = 1'b1;  
@@ -209,9 +209,10 @@ initial begin
 
 
 		/////// Kernel data writing to L0 ///////
+		// must modify for 2b as kernel is twice sized (2col)
 		A_xmem = 11'b10000000000;
 
-		for (t=0; t<col; t=t+1) begin
+		for (t=0; t<col*2; t=t+1) begin
 			#0.5 clk = 0;
 			l0_wr = 1;
 			CEN_xmem = 0;
@@ -234,10 +235,12 @@ initial begin
 
 		// only 8 (#col) number of "loads" need to be sent
 		// but it's fine if we send more as they just won't be used.
-		for (t=0; t<row+col; t=t+1) begin
+		// must modify for 2b as kernel is twice sized (2col)
+		// kernel loading VERIFIED.
+		for (t=0; t<row+col*2; t=t+1) begin
 			#0.5 clk = 0;
-			mode = 1;
-			if (t >= col) begin
+			mode = 0;
+			if (t >= col*2) begin
 				l0_rd = 1;
 				load = 0;
 			end else begin
@@ -259,7 +262,6 @@ initial begin
 		end
 		/////////////////////////////////////
 
-		// I AM SURE EVERYTHING ABOVE THIS POINT IS FINE!!!
 
 		/////// Activation data writing to L0 ///////
 		A_xmem = 11'b00000000000;
@@ -287,20 +289,20 @@ initial begin
 		/////// Execution ///////
 		// enable operations for nij cycles
 		// simultaneously, enable l0_rd for nij+col cycles.
-		for (t=0; t<len_nij+col; t=t+1) begin
+		for (t=0; t<len_nij+col*2; t=t+1) begin
 			#0.5 clk = 0;
 			if (t < len_nij) 
 				execute = 1;		
 			else 
 				execute = 0;
 			l0_rd = 1;
-			mode = 1;
+			mode = 0;
 			#0.5 clk = 1;
 		end
 
 		#0.5 clk = 1'b0;  
 		l0_rd = 0;
-		mode = 1;
+		mode = 0;
 		execute = 0;
 		#0.5 clk = 1'b1; 
 
@@ -350,13 +352,36 @@ initial begin
 				#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
 		#0.5 clk = 1'b1; 
 
+		
+
+		#0.5 clk = 1'b0;  
+		#0.5 clk = 1'b1;
+
+		A_pmem = 0;
+		// +4 useless cycles for it to propagate back to our visual 
+		// +1 on the end to make sure terminates
+		/*
+		for (t=0; t<len_nij+4; t=t+1) begin
+			#0.5 clk = 0;
+			A_pmem = t;
+			
+			CEN_pmem = 0;
+			$display("psum outputs: %0d", t);
+			for (j = 0; j < col; j = j + 1) begin
+				$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
+				// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
+			end
+			$display("-----------------------");
+			#0.5 clk = 1;
+		end
+		*/
 
 	end  // end of kij loop
-
+	
 
 	#0.5 clk = 1'b0;  
 	#0.5 clk = 1'b1;
-
+	
 	A_pmem = 0;
 	// +4 useless cycles for it to propagate back to our visual 
 	// +1 on the end to make sure terminates
@@ -364,10 +389,7 @@ initial begin
 		#0.5 clk = 0;
 		A_pmem = (t/4)*6 + t%4;
 		
-		/*
-		if (t < len_nij-4) CEN_pmem = 0;
-		else CEN_pmem = 1;
-		*/
+
 		CEN_pmem = 0;
 		$display("psum outputs: %0d", t, A_pmem);
 		for (j = 0; j < col; j = j + 1) begin
@@ -383,9 +405,9 @@ initial begin
 	#0.5 clk = 1'b1;
 	#0.5 clk = 1'b0;  
 	#0.5 clk = 1'b1;
-
+	
 	CEN_pmem = 1;
-	out_file = $fopen("out.txt", "r");  
+	out_file = $fopen("out2.txt", "r");  
 
 	// Following three lines are to remove the first three comment lines of the file
 	out_scan_file = $fscanf(out_file,"%s", answer); 
@@ -402,10 +424,7 @@ initial begin
 		#0.5 clk = 0;
 		A_pmem = (t/4)*6 + t%4;
 		
-		/*
-		if (t < len_nij-4) CEN_pmem = 0;
-		else CEN_pmem = 1;
-		*/
+
 		CEN_pmem = 0;
 		if (t>=4) begin
 			out_scan_file = $fscanf(out_file,"%128b", answer); // reading from out file to answer
@@ -429,77 +448,6 @@ initial begin
 	end
 	/// verification start
 
-
-
-/*
-	////////// Accumulation /////////
-	out_file = $fopen("out.txt", "r");  
-
-	// Following three lines are to remove the first three comment lines of the file
-	out_scan_file = $fscanf(out_file,"%s", answer); 
-	out_scan_file = $fscanf(out_file,"%s", answer); 
-	out_scan_file = $fscanf(out_file,"%s", answer); 
-
-	error = 0;
-
-
-
-	$display("############ Verification Start during accumulation #############"); 
-
-	for (i=0; i<len_onij+1; i=i+1) begin 
-
-		#0.5 clk = 1'b0; 
-		#0.5 clk = 1'b1; 
-
-		if (i>0) begin
-			out_scan_file = $fscanf(out_file,"%128b", answer); // reading from out file to answer
-			if (sfp_out == answer)
-				$display("%2d-th output featuremap Data matched! :D", i); 
-			else begin
-				$display("%2d-th output featuremap Data ERROR!!", i); 
-				$display("sfpout: %128b", sfp_out);
-				$display("answer: %128b", answer);
-				error = 1;
-			 end
-		end
-	 
- 
-		#0.5 clk = 1'b0; reset = 1;
-		#0.5 clk = 1'b1;  
-		#0.5 clk = 1'b0; reset = 0; 
-		#0.5 clk = 1'b1;  
-
-		for (j=0; j<len_kij+1; j=j+1) begin 
-
-			#0.5 clk = 1'b0;   
-				if (j<len_kij) begin CEN_pmem = 0; WEN_pmem = 1; acc_scan_file = $fscanf(acc_file,"%11b", A_pmem); end
-											 else  begin CEN_pmem = 1; WEN_pmem = 1; end
-
-				if (j>0)  acc = 1;  
-			#0.5 clk = 1'b1;   
-		end
-
-		#0.5 clk = 1'b0; acc = 0;
-		#0.5 clk = 1'b1; 
-	end
-
-
-	if (error == 0) begin
-		$display("############ No error detected ##############"); 
-		$display("########### Project Completed !! ############"); 
-
-	end
-
-	$fclose(acc_file);
-	//////////////////////////////////
-
-	for (t=0; t<10; t=t+1) begin  
-		#0.5 clk = 1'b0;  
-		#0.5 clk = 1'b1;  
-	end
-
-*/
-
 	
 	for (t=0; t<len_nij; t=t+1) begin
 		#0.5 clk = 0;
@@ -508,7 +456,7 @@ initial begin
 		#0.5 clk = 1;
 	end
 	
-	#10 $finish;
+	$finish;
 
 end
 

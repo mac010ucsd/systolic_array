@@ -34,7 +34,7 @@ print(f"Output shape: {output.shape}")
 X = torch.flatten(input_tensor, 1,2)
 
 bit_precision = 2
-file = open('activation_tile0_2b.txt', 'w') #write to file
+file = open('activation2_tile0.txt', 'w') #write to file
 file.write('#time0row15[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
 file.write('#time1row15[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
 file.write('#................#\n')
@@ -60,22 +60,29 @@ W = torch.flatten(conv.weight, 2,3)
 bit_precision = 4
 
 for kij in range(9):
-    file = open(f'weight_itile0_otile0_kij{kij}_2b.txt', 'w') #write to file
+    file = open(f'weight2_itile0_otile0_kij{kij}.txt', 'w') #write to file
     file.write('#time0row7[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
     file.write('#time1row7[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
     file.write('#................#\n')
     for j in range(W.size(0)): # per OC (8)
-        for i in range(W.size(1)):  # per IC (16)
+        
+        if (kij == 0):
+            print(W[j, :, kij])
+        for i in range(1, W.size(1), 2):  # per EVEN IC (16)-> 8
             W_bin = z(round(W[j,15-i,kij].item())) # reverse IC
             for k in range(bit_precision):
                 file.write(W_bin[k])        
             #file.write(' ')  # for visibility with blank between words, you can use
-            if (i == 7):
-                file.write("\n") # split at middle to fit (7-0) (15-8)
+        
+        file.write("\n") # split at middle to fit (7-0) (15-8)
+        for i in range(0, W.size(1), 2):  # per ODD IC (16) -> 8
+            W_bin = z(round(W[j,15-i,kij].item())) # reverse IC
+            for k in range(bit_precision):
+                file.write(W_bin[k])      
         file.write('\n')
     file.close() #close file   
 
-print(W.shape)
+# print(W.shape)
 
 # want input  channel to be a row?
 # output channel is columns
@@ -83,7 +90,7 @@ print(W.shape)
 
 # OC IC KIJ
 
-print(output.flatten(1,2).T)
+# print(output.flatten(1,2).T)
 
 P = output.flatten(1,2).T
 
@@ -96,7 +103,7 @@ z = lambda x: ("{0:016b}".format(x) if x >= 0 else "1{0:015b}".format(2**15+x))
 # W = w_tile[tile_id,:,:,kij]  # w_tile[tile_num, array col num, array row num, kij]
 
 bit_precision = 16
-file = open(f'out_2b.txt', 'w') #write to file
+file = open(f'out2.txt', 'w') #write to file
 
 file.write('#time0row7[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
 file.write('#time1row7[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
