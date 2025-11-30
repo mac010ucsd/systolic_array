@@ -127,7 +127,7 @@ file.write('#time1row7[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
 file.write('#................#\n')
 for j in range(P.size(0)): # per row
     for i in range(P.size(1)):  # per col
-        W_bin = z(round(P[j,7-i].item())) # reverse IC
+        W_bin = z(round(P[j,7-i].item())) # reverse OC
         for k in range(bit_precision):
             file.write(W_bin[k])        
         #file.write(' ')  # for visibility with blank between words, you can use

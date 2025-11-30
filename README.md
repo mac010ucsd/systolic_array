@@ -7,10 +7,9 @@
 - [X] mac row tb 4-bit
 - [X] mac array
 - [X] mac array tb
-- [ ] corelet
-- [ ] core
-- [ ] etc
-
-## notes
-
-Assignment update changed it such that there is no need to split 4x4 bit and 2x4 bit psums into different lanes anymore.
+- [X] corelet
+- [X] core
+- [X] core tb 4 bit act 8x8
+- [X] core tb 2 bit act 16x8
+- [ ] tiling 2 bit act 16x16 
+- [ ] core tb tiling 2 bit act 16x16 

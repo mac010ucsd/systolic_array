@@ -29,7 +29,7 @@ parameter col = 2;
 parameter row = 2;
 
 /*
-assign inst_q[33] = acc_q;              accumulate mode, unimplemented so far.
+assign inst_q[33] = acc_q;              accumulate mode 
 assign inst_q[32] = CEN_pmem_q;         pmem cen (low active, will not read/write when high)
 assign inst_q[31] = WEN_pmem_q;         pmem wen (low active)
 assign inst_q[30:20] = A_pmem_q;        pmem address
