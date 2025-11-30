@@ -114,6 +114,7 @@ initial begin
 	execute  = 0;
 	load     = 0;
 	mode	 = 1;
+	acc = 0;
 
 	$dumpfile("core_tb.vcd");
 	$dumpvars(0,core_tb);
@@ -155,7 +156,7 @@ initial begin
 	/////////////////////////////////////////////////
 
 
-	for (kij=0; kij<1; kij=kij+1) begin  // kij loop
+	for (kij=0; kij<2; kij=kij+1) begin  // kij loop
 
 		case(kij)
 			0: w_file_name = "weight_itile0_otile0_kij0.txt";
@@ -313,16 +314,21 @@ initial begin
 		
 		A_pmem = 11'b00000000000;
 		sel = kij[0];
+		if (kij > 0)
+			acc = 1;
 
 		// enable ofifo reading one cycle early
+		
 		for (t=0; t<1; t=t+1) begin
 			#0.5 clk = 0;
 			ofifo_rd = 1;
 			#0.5 clk = 1;
 		end
-
+		
 		for (t=0; t<len_nij; t=t+1) begin  
 			#0.5 clk = 1'b0; 
+			if (t > len_nij-2)
+				ofifo_rd = 0;
 			WEN_pmem = 0; CEN_pmem = 0; 
 			if (t>0) A_pmem = A_pmem + 1; 
 			#0.5 clk = 1'b1;  
@@ -350,7 +356,8 @@ initial begin
 	*/
 
 		A_pmem = 0;
-		for (t=0; t<len_nij+4; t=t+1) begin
+		// +4 cycles for it to propagate back to our visual
+		for (t=0; t<len_nij+5; t=t+1) begin
 			#0.5 clk = 0;
 			if (t>0) A_pmem = A_pmem + 1;
 			/*
@@ -367,34 +374,7 @@ initial begin
 			#0.5 clk = 1;
 		end
 
-		/*
-		// takes 4 cycles for ofifo 'rd' to propagate (to our visuals)
-		for (t=0; t<4; t=t+1) begin
-			#0.5 clk = 0;
-			ofifo_rd = 1;
-			#0.5 clk = 1;
-		end
-
-
-		for (t=0; t<len_nij; t=t+1) begin
-			#0.5 clk = 0;
-			ofifo_rd = 1;
-			$display("psum outputs: %0d %b", t, ofifo_valid_q);
-			for (j = 0; j < col; j = j + 1) begin
-				$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
-			end
-			$display("-----------------------");
-			#0.5 clk = 1;
-		end
-
-		#0.5 clk = 1'b0;  
-		ofifo_rd = 0;
-		#0.5 clk = 1'b1; 
-
-		*/
-
-		/////////////////////////////////////
-
+		CEN_pmem = 1;
 
 	end  // end of kij loop
 

@@ -101,7 +101,9 @@ corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet
 	.out(o_corelet),      
 	.inst(inst_corelet_qq),
 	.ofifo_rd(ofifo_rd_q),
-	.valid(ofifo_valid)
+	.valid(ofifo_valid),
+	.o_sram_in(o_sram_corelet), // fill later
+	.sfu_en(acc_q)
 );
 
 wire [psum_bw*col-1:0] o_corelet;
@@ -129,11 +131,15 @@ wire [psum_bw*col-1:0] o_pmem_odd;
 wire wen_pmem_even_q;
 wire wen_pmem_odd_q;
 
-assign wen_pmem_even_q = !sel & wen_pmem_q;
-assign wen_pmem_odd_q = sel & wen_pmem_q;
-assign sfp_out = sel ? o_pmem_odd : o_pmem_even;
+// need to delay 2 cycles,
 
+assign wen_pmem_even_q = !(!sel_q & !wen_pmem_q);
+assign wen_pmem_odd_q = !(sel_q & !wen_pmem_q);
+assign sfp_out = sel_q ? o_pmem_odd : o_pmem_even;
 
+// acc_q, cen, wen, sel
+// SEL = bank to write to (delay 2 cycles?)
+// !SEL = bank to read from
 
 sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even (
 	.CLK(clk),
@@ -143,6 +149,17 @@ sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even (
 	.A(a_pmem_q),
 	.Q(o_pmem_even)
 );
+
+wire [psum_bw*col-1:0] o_sram_corelet;
+// the "other" bank goes to corelet
+assign o_sram_corelet = sel ? o_pmem_even : o_pmem_even;
+
+/*
+reg [10:0] a_pmem_qq;
+reg [10:0] a_pmem_qqq;
+reg wen_pmem_q;
+reg wen_pmem_qq;
+*/
 
 sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd (
 	.CLK(clk),
