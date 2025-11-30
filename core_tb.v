@@ -10,7 +10,8 @@ parameter len_kij = 9;
 parameter len_onij = 16;
 parameter col = 8;
 parameter row = 8;
-parameter len_nij = 16; // 36?
+parameter len_nij = 36; // 36?
+parameter nij_sz = 6;
 
 reg clk = 0;
 reg reset = 1;
@@ -156,7 +157,7 @@ initial begin
 	/////////////////////////////////////////////////
 
 
-	for (kij=0; kij<2; kij=kij+1) begin  // kij loop
+	for (kij=0; kij<9; kij=kij+1) begin  // kij loop
 
 		case(kij)
 			0: w_file_name = "weight_itile0_otile0_kij0.txt";
@@ -312,23 +313,28 @@ initial begin
 		// Ideally, OFIFO should be read while execution, but we have enough ofifo
 		// depth so we can fetch out after execution.
 		
-		A_pmem = 11'b00000000000;
 		sel = kij[0];
 		if (kij > 0)
 			acc = 1;
 
-		// enable ofifo reading one cycle early
+		// enable ofifo reading ONE cycle early
 		
 		for (t=0; t<1; t=t+1) begin
 			#0.5 clk = 0;
 			ofifo_rd = 1;
 			#0.5 clk = 1;
 		end
-		
+
+		A_pmem = 11'b00000000000 - (kij % 3 + (kij / 3) * nij_sz);
+
+
 		for (t=0; t<len_nij; t=t+1) begin  
 			#0.5 clk = 1'b0; 
-			if (t > len_nij-2)
+			/* // we don't need to stop ofifo rd as ofifo will automatically stop reading
+			// when empty? or just in accumulate mode?
+			if (t > len_nij-2) //
 				ofifo_rd = 0;
+			*/
 			WEN_pmem = 0; CEN_pmem = 0; 
 			if (t>0) A_pmem = A_pmem + 1; 
 			#0.5 clk = 1'b1;  
@@ -354,30 +360,52 @@ initial begin
 			#0.5 clk = 1;
 		end
 	*/
-
+		/*
 		A_pmem = 0;
-		// +4 cycles for it to propagate back to our visual
+		// +4 useless cycles for it to propagate back to our visual 
+		// +1 on the end to make sure terminates
 		for (t=0; t<len_nij+5; t=t+1) begin
 			#0.5 clk = 0;
 			if (t>0) A_pmem = A_pmem + 1;
-			/*
-			if (t < len_nij-4) CEN_pmem = 0;
-			else CEN_pmem = 1;
-			*/
+
 			CEN_pmem = 0;
-			$display("psum outputs: %0d", t);
-			for (j = 0; j < col; j = j + 1) begin
-				$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
-				// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
+			if ((t >= 4) && ((t-4)%6 < 4) && ((t-4) < 6*4)) begin
+				$display("psum outputs: %0d", t);
+				for (j = 0; j < col; j = j + 1) begin
+					$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
+					// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
+				end
 			end
 			$display("-----------------------");
 			#0.5 clk = 1;
 		end
 
 		CEN_pmem = 1;
-
+		*/
 	end  // end of kij loop
 
+	A_pmem = 0;
+	// +4 useless cycles for it to propagate back to our visual 
+	// +1 on the end to make sure terminates
+	for (t=0; t<len_onij+4; t=t+1) begin
+		#0.5 clk = 0;
+		A_pmem = (t/4)*6 + t%4;
+		
+		/*
+		if (t < len_nij-4) CEN_pmem = 0;
+		else CEN_pmem = 1;
+		*/
+		CEN_pmem = 0;
+		$display("psum outputs: %0d", t);
+		for (j = 0; j < col; j = j + 1) begin
+			$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
+			// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
+		end
+		$display("-----------------------");
+		#0.5 clk = 1;
+	end
+
+	CEN_pmem = 1;
 
 /*
 	////////// Accumulation /////////

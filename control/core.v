@@ -55,6 +55,15 @@ reg [10:0] a_xmem_q;
 reg ofifo_rd_q;
 reg [4:0] inst_corelet_q;
 reg sel_q;
+reg wen_pmem_qq;
+reg wen_pmem_qqq;
+reg cen_pmem_qq;
+reg cen_pmem_qqq;
+reg sel_qq;
+reg sel_qqq;
+reg [10:0] a_pmem_qq;
+reg [10:0] a_pmem_qqq;
+
 
 reg [31:0] D_xmem_q;
 // no ififo
@@ -86,6 +95,15 @@ always @(posedge clk) begin
 		inst_corelet_qq <= inst_corelet_q;
 		D_xmem_q    <= D_xmem;
 		sel_q <= sel;
+		
+		sel_qq <= sel_q;
+		sel_qqq <= sel_qq;
+		wen_pmem_qq <= wen_pmem_q;
+		wen_pmem_qqq <= wen_pmem_qq;
+		cen_pmem_qq <= cen_pmem_q;
+		cen_pmem_qqq <= cen_pmem_qq;
+		a_pmem_qq <= a_pmem_q;
+		a_pmem_qqq <= a_pmem_qq;
 	end
 end
 
@@ -133,8 +151,8 @@ wire wen_pmem_odd_q;
 
 // need to delay 2 cycles,
 
-assign wen_pmem_even_q = !(!sel_q & !wen_pmem_q);
-assign wen_pmem_odd_q = !(sel_q & !wen_pmem_q);
+assign wen_pmem_even_q = !(!sel_qqq & !wen_pmem_qqq);
+assign wen_pmem_odd_q = !(sel_qqq & !wen_pmem_qqq);
 assign sfp_out = sel_q ? o_pmem_odd : o_pmem_even;
 
 // acc_q, cen, wen, sel
@@ -144,15 +162,15 @@ assign sfp_out = sel_q ? o_pmem_odd : o_pmem_even;
 sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even (
 	.CLK(clk),
 	.WEN(wen_pmem_even_q),
-	.CEN(cen_pmem_q),
+	.CEN(wen_pmem_even_q ? cen_pmem_q: cen_pmem_qqq),
 	.D(o_corelet),
-	.A(a_pmem_q),
+	.A(wen_pmem_even_q ? a_pmem_q: a_pmem_qqq),
 	.Q(o_pmem_even)
 );
 
 wire [psum_bw*col-1:0] o_sram_corelet;
 // the "other" bank goes to corelet
-assign o_sram_corelet = sel ? o_pmem_even : o_pmem_even;
+assign o_sram_corelet = sel ? o_pmem_even : o_pmem_odd;
 
 /*
 reg [10:0] a_pmem_qq;
@@ -161,16 +179,16 @@ reg wen_pmem_q;
 reg wen_pmem_qq;
 */
 
+// delay write address by 2 when writing.
+
+
 sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd (
 	.CLK(clk),
 	.WEN(wen_pmem_odd_q),
-	.CEN(cen_pmem_q),
+	.CEN(wen_pmem_odd_q ? cen_pmem_q: cen_pmem_qqq),
 	.D(o_corelet),
-	.A(a_pmem_q),
+	.A(wen_pmem_odd_q ? a_pmem_q: a_pmem_qqq),
 	.Q(o_pmem_odd)
 );
-
-
-
 
 endmodule

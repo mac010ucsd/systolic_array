@@ -109,6 +109,7 @@ always @(posedge clk) begin
 end
 
 wire o_valid;
+reg o_valid_q;
 
 ofifo #(.col(col), .bw(psum_bw)) ofifo_instance (
 	.clk(clk),
@@ -129,6 +130,7 @@ ofifo #(.col(col), .bw(psum_bw)) ofifo_instance (
 wire [psum_bw * col - 1:0] sfu_out;
 wire [psum_bw * col - 1:0] ofifo_out;
 reg [psum_bw * col - 1:0] ofifo_out_q;
+reg [psum_bw * col - 1:0] ofifo_out_qq;
 reg sfu_en_q;
 reg sfu_en_qq;
 reg sfu_en_qqq;
@@ -137,9 +139,11 @@ always @(posedge clk) begin
 		ofifo_out_q <= 0;
 	else
 		ofifo_out_q <= ofifo_out;
+		ofifo_out_qq <= ofifo_out_q;
 		sfu_en_q <= sfu_en;
 		sfu_en_qq <= sfu_en_q;
 		sfu_en_qqq <= sfu_en_qq;
+		o_valid_q <= o_valid;
 end
 
 
@@ -147,7 +151,7 @@ sfu_bank #(.col(col), .psum_bw(psum_bw)) sfu_bank_instance (
 	.clk(clk),
 	.psum_in(ofifo_out_q),
 	.psum_mem(o_sram_in),
-	.valid(o_valid),
+	.valid(o_valid_q),
 	.psum_out(sfu_out)
 );
 
@@ -161,6 +165,6 @@ sfu_bank #(.col(col), .psum_bw(psum_bw)) sfu_bank_instance (
 // SRAM_IN arrives 
 
 // SFU_OUT exits (2), must be written to same index SRAM on diff bank.
-assign out = sfu_en_qqq ? sfu_out : ofifo_out;
+assign out = sfu_en_qqq ? sfu_out : ofifo_out_qq;
 
 endmodule
