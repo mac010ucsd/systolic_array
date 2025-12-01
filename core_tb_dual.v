@@ -93,6 +93,13 @@ assign inst_q[0]   = load_q;
 reg [col-1:0][psum_bw-1:0] sfp_out_q; // just for testing
 reg ofifo_valid_q;
 
+function integer calc_index;
+	input integer a;
+	begin
+		calc_index = (a/onij_sz)*nij_sz + a%onij_sz;
+	end
+endfunction
+
 core  #(.col(col), .row(row), .psum_bw(psum_bw)) core_instance (
 	.clk(clk), 
 	.inst(inst_q),
@@ -126,7 +133,7 @@ initial begin
 	$dumpfile("core_tb_dual.vcd");
 	$dumpvars(0,core_tb_dual);
 
-	x_file = $fopen("tests/2_16x16/act_tile0.txt", "r");
+	x_file = $fopen("tests/2b_vgg/act_tile0.txt", "r");
 	// Following three lines are to remove the first three comment lines of the file
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
@@ -166,15 +173,15 @@ initial begin
 	for (kij=0; kij<9; kij=kij+1) begin  // kij loop
 		$display(kij);
 		case(kij)
-			0: w_file_name = "tests/2_16x16/w_i0_o0_kij0.txt";
-			1: w_file_name = "tests/2_16x16/w_i0_o0_kij1.txt";
-			2: w_file_name = "tests/2_16x16/w_i0_o0_kij2.txt";
-			3: w_file_name = "tests/2_16x16/w_i0_o0_kij3.txt";
-			4: w_file_name = "tests/2_16x16/w_i0_o0_kij4.txt";
-			5: w_file_name = "tests/2_16x16/w_i0_o0_kij5.txt";
-			6: w_file_name = "tests/2_16x16/w_i0_o0_kij6.txt";
-			7: w_file_name = "tests/2_16x16/w_i0_o0_kij7.txt";
-			8: w_file_name = "tests/2_16x16/w_i0_o0_kij8.txt";
+			0: w_file_name = "tests/2b_vgg/w_i0_o0_kij0.txt";
+			1: w_file_name = "tests/2b_vgg/w_i0_o0_kij1.txt";
+			2: w_file_name = "tests/2b_vgg/w_i0_o0_kij2.txt";
+			3: w_file_name = "tests/2b_vgg/w_i0_o0_kij3.txt";
+			4: w_file_name = "tests/2b_vgg/w_i0_o0_kij4.txt";
+			5: w_file_name = "tests/2b_vgg/w_i0_o0_kij5.txt";
+			6: w_file_name = "tests/2b_vgg/w_i0_o0_kij6.txt";
+			7: w_file_name = "tests/2b_vgg/w_i0_o0_kij7.txt";
+			8: w_file_name = "tests/2b_vgg/w_i0_o0_kij8.txt";
 		endcase
 		
 
@@ -187,10 +194,12 @@ initial begin
 		#0.5 clk = 1'b0;   reset = 1;
 		#0.5 clk = 1'b1; 
 
+		/*
 		for (i=0; i<10 ; i=i+1) begin
 			#0.5 clk = 1'b0;
 			#0.5 clk = 1'b1;  
 		end
+		*/
 
 		#0.5 clk = 1'b0;   reset = 0;
 		#0.5 clk = 1'b1; 
@@ -213,40 +222,31 @@ initial begin
 
 			#0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0;
 			#0.5 clk = 1'b1; 
-			/////////////////////////////////////
 
-
-			/////// Kernel data writing to L0 ///////
-			// must modify for 2b as kernel is twice sized (2col)
-			A_xmem = 11'b10000000000;
-
-			for (t=0; t<col*2; t=t+1) begin
-				#0.5 clk = 0;
-				l0_wr = 1;
-				CEN_xmem = 0;
-				if (t>0) A_xmem = A_xmem + 1;
-				#0.5 clk = 1;
-			end
-
-			#0.5 clk = 1'b0;  CEN_xmem = 1; l0_wr = 0;
-			#0.5 clk = 1'b1; 
-			/////////////////////////////////////
-			
-
-
-			/////// Kernel loading to PEs ///////
-			// should take roughly 2col+1 to propagate to end
-			// so row+2col+1 to propagate to bottom right corner.
-			// just trust that it works.
-			
-			/////////////////////////////////////
-
+			/////// Kernel loading to PEs, simultaneous with kernel data writing to L0///////
 			// only 8 (#col) number of "loads" need to be sent
 			// but it's fine if we send more as they just won't be used.
 			// must modify for 2b as kernel is twice sized (2col)
-			// kernel loading VERIFIED.
+			
+			// must start L0 writing at 1 cycle before L0 reading
+
+			A_xmem = 11'b10000000000;
+			#0.5 clk = 0;
+			l0_wr = 1;
+			CEN_xmem = 0;
+			#0.5 clk = 1;
+
 			for (t=0; t<row+col*2; t=t+1) begin
 				#0.5 clk = 0;
+
+				// only allow kernel data write to L0 for col*2 cycles
+				if (t >= 0) A_xmem = A_xmem + 1;
+				if (t >= col*2-1) begin
+					l0_wr = 0;
+					CEN_xmem = 1;
+				end
+
+				// kernel loading to PE simultaneous out of L0
 				mode = 0;
 				if (t >= col*2) begin
 					l0_rd = 1;
@@ -262,21 +262,13 @@ initial begin
 			////// provide some intermission to clear up the kernel loading ///
 			#0.5 clk = 1'b0;  load = 0; l0_rd = 0;
 			#0.5 clk = 1'b1;  
-		
 
-			for (i=0; i<10 ; i=i+1) begin
-				#0.5 clk = 1'b0;
-				#0.5 clk = 1'b1;  
-			end
-			/////////////////////////////////////
 		end
 
 
 		/////// Activation data writing to L0 ///////
 		A_xmem = 11'b00000000000;
 		tile = 2'b11;
-
-		// 110 ns - 0.5 here.
 
 		for (t=0; t<len_nij; t=t+1) begin
 			#0.5 clk = 0;
@@ -288,7 +280,8 @@ initial begin
 		
 		// 16 cycles
 
-		#0.5 clk = 1'b0;  CEN_xmem = 1; A_xmem = 0;
+		#0.5 clk = 1'b0;  
+		CEN_xmem = 1; A_xmem = 0;
 		l0_wr = 0;
 		#0.5 clk = 1'b1; 
 
@@ -325,19 +318,21 @@ initial begin
 		// Ideally, OFIFO should be read while execution, but we have enough ofifo
 		// depth so we can fetch out after execution.
 		
+
+
+		// must enable ofifo reading ONE cycle early to match timings
+		// extra ofifo reads (> len_nij) does not affect process,
+		// extra acc reads does not affect process.
+		
+		#0.5 clk = 0;
+		ofifo_rd = 1;
 		sel = kij[0];
 		if (kij > 0)
 			acc = 1;
 
-		// enable ofifo reading ONE cycle early
-		
-		for (t=0; t<1; t=t+1) begin
-			#0.5 clk = 0;
-			ofifo_rd = 1;
-			#0.5 clk = 1;
-		end
-
+		// we are offsetting A_pmem to align the SFU write to the correct place
 		A_pmem = 11'b00000000000 - (kij % 3 + (kij / 3) * nij_sz) ;
+		#0.5 clk = 1;
 
 
 		for (t=0; t<len_nij; t=t+1) begin  
@@ -349,60 +344,36 @@ initial begin
 		end
 
 
-		#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0; ofifo_rd = 0;
+		#0.5 clk = 1'b0;  
+		WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0; ofifo_rd = 0;
+		acc = 0;
 		#0.5 clk = 1'b1; 
-			#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
-			A_pmem = 0;
-			acc = 0; // earliest time to disable acc (must be at least 2 cycles)
-		#0.5 clk = 1'b1; 
-				#0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
-		#0.5 clk = 1'b1; 
-
 		
-
+		// needs the minimum 2 cycles before reset
+		// or else reset literally destroys everything.
+		
+		#0.5 clk = 1'b0;  
+		#0.5 clk = 1'b1;		
 		#0.5 clk = 1'b0;  
 		#0.5 clk = 1'b1;
 
-		A_pmem = 0;
-		// +4 useless cycles for it to propagate back to our visual 
-		// +1 on the end to make sure terminates
-		/*
-		for (t=0; t<len_nij+4; t=t+1) begin
-			#0.5 clk = 0;
-			A_pmem = t;
-			
-			CEN_pmem = 0;
-			$display("psum outputs: %0d", t);
-			for (j = 0; j < col; j = j + 1) begin
-				$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
-				// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
-			end
-			$display("-----------------------");
-			#0.5 clk = 1;
-		end
-		*/
-
 	end  // end of kij loop
-	
 
-	#0.5 clk = 1'b0;  
-	#0.5 clk = 1'b1;
-	
 	// dump tile0
 	tile = 2'b01;
-	A_pmem = 0;
-	// +4 useless cycles for it to propagate back to our visual 
-	// +1 on the end to make sure terminates
+
+	// after sending signal, we need to wait 4 cycles before we
+	// receive it
+
 	for (t=0; t<len_onij+4; t=t+1) begin
 		#0.5 clk = 0;
-		A_pmem = (t/onij_sz)*nij_sz + t%onij_sz;
+		A_pmem = calc_index(t); //(t/onij_sz)*nij_sz + t%onij_sz;
 		
 
 		CEN_pmem = 0;
-		$display("psum outputs: %0d", t, (((t-4)/onij_sz)*nij_sz + (t-4)%onij_sz));
+		$display("psum outputs: %0d %0d", t, calc_index(t-4));
 		for (j = 0; j < col; j = j + 1) begin
 			$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
-			// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
 		end
 		$display("-----------------------");
 		#0.5 clk = 1;
@@ -420,22 +391,22 @@ initial begin
 	tile = 2'b10;
 	A_pmem = 0;
 	
+	/*
 	#0.5 clk = 1'b0;  
 	#0.5 clk = 1'b1;
 	#0.5 clk = 1'b0;  
-	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b1;*/
 	// +4 useless cycles for it to propagate back to our visual 
 	// +1 on the end to make sure terminates
 	for (t=0; t<len_onij+4; t=t+1) begin
 		#0.5 clk = 0;
-		A_pmem = (t/onij_sz)*nij_sz + t%onij_sz;
+		A_pmem = calc_index(t);
 		
 
 		CEN_pmem = 0;
-		$display("psum outputs: %0d", t, (((t-4)/onij_sz)*nij_sz + (t-4)%onij_sz));
+		$display("psum outputs: %0d %d", t, calc_index (t-4));
 		for (j = 0; j < col; j = j + 1) begin
 			$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
-			// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
 		end
 		$display("-----------------------");
 		#0.5 clk = 1;
@@ -448,14 +419,10 @@ initial begin
 	#0.5 clk = 1'b1;
 	#0.5 clk = 1'b0;  
 	#0.5 clk = 1'b1;
-	#0.5 clk = 1'b0;  
-	#0.5 clk = 1'b1;
-
-	// 0 tile output has issues...
 
 	
 	CEN_pmem = 1;
-	out_file = $fopen("tests/2_16x16/out.txt", "r");  
+	out_file = $fopen("tests/2b_vgg/out.txt", "r");  
 
 	// Following three lines are to remove the first three comment lines of the file
 	out_scan_file = $fscanf(out_file,"%s", answer); 
@@ -465,31 +432,25 @@ initial begin
 	error = 0;
 
 	$display("############ Verification Start #############"); 
-	tile = 2'b00;
 	A_pmem = 0;
-	#0.5 clk = 1'b0;  
-	#0.5 clk = 1'b1;
-	#0.5 clk = 1'b0;  
-	#0.5 clk = 1'b1;
-	#0.5 clk = 1'b0;  
-	#0.5 clk = 1'b1;
-	#0.5 clk = 1'b0;  
-	#0.5 clk = 1'b1;
+
+	
 	// +4 useless cycles for it to propagate back to our visual 
 	// need to alternate loading 
 	for (t=0; t<(len_onij*htiles)+4; t=t+1) begin
 		#0.5 clk = 0;
 		A_pmem = ((t/htiles)/onij_sz)*nij_sz + (t/htiles)%onij_sz;
-		tile = (1'b1 << (t%2)); // load MSB tile first (1) then (0) 
+		tile = (1'b1 << (t%2)); // load LSB tile first (0) then load MSB tile (1)
+		// because that's how our data is stored.
 		CEN_pmem = 0;
 		if (t>=4) begin
 			out_scan_file = $fscanf(out_file,"%128b", answer); // reading from out file to answer
 			if (sfp_out_q == answer)
 				$display("%2d-th output featuremap Data matched! :D idx %0d tile %2b", 
-					(t-4)/htiles, (((t-4)/htiles)/onij_sz)*nij_sz + ((t-4)/htiles)%onij_sz, tile); 
+					(t-4)/htiles, calc_index((t-4)/htiles), tile); 
 			else begin
 				$display("%2d-th output featuremap Data ERROR!! idx %0d tile %2b", (t-4)/htiles, 
-					(((t-4)/htiles)/onij_sz)*nij_sz + ((t-4)/htiles)%onij_sz, tile); 
+					calc_index((t-4)/htiles), tile); 
 				$display("sfpout: %128b", sfp_out_q);
 				$display("answer: %128b", answer);
 				error = 1;
@@ -498,22 +459,13 @@ initial begin
 		end
 		#0.5 clk = 1;
 	end
+
 	
 	if (error == 0) begin
 		$display("############ No error detected ##############"); 
 		$display("########### Project Completed !! ############"); 
 
 	end
-	/// verification start
-
-	
-	for (t=0; t<len_nij; t=t+1) begin
-		#0.5 clk = 0;
-		ofifo_rd = 1;
-
-		#0.5 clk = 1;
-	end
-	
 	$finish;
 
 end
