@@ -46,6 +46,8 @@ reg mode;
 reg mode_q = 0;
 reg sel = 0;
 reg sel_q = 0;
+reg [1:0] tile;
+reg [1:0] tile_q;
 
 reg [1:0]  inst_w; 
 reg [bw*row-1:0] D_xmem;
@@ -98,7 +100,8 @@ core  #(.col(col), .row(row), .psum_bw(psum_bw)) core_instance (
 	.sfp_out(sfp_out), 
 	.mode(mode_q),
 	.reset(reset),
-	.sel(sel_q)); 
+	.sel(sel_q),
+	.tile(tile_q)); 
 
 
 initial begin 
@@ -116,12 +119,13 @@ initial begin
 	execute  = 0;
 	load     = 0;
 	mode	 = 0;
-	acc = 0;
+	acc 	 = 0;
+	tile = 2'b01;
 
 	$dumpfile("core_tb_2b.vcd");
 	$dumpvars(0,core_tb_2b);
 
-	x_file = $fopen("activation2_tile0.txt", "r");
+	x_file = $fopen("tests/2_16x8/act_tile0.txt", "r");
 	// Following three lines are to remove the first three comment lines of the file
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
@@ -161,15 +165,15 @@ initial begin
 	for (kij=0; kij<9; kij=kij+1) begin  // kij loop
 		$display(kij);
 		case(kij)
-			0: w_file_name = "weight2_itile0_otile0_kij0.txt";
-			1: w_file_name = "weight2_itile0_otile0_kij1.txt";
-			2: w_file_name = "weight2_itile0_otile0_kij2.txt";
-			3: w_file_name = "weight2_itile0_otile0_kij3.txt";
-			4: w_file_name = "weight2_itile0_otile0_kij4.txt";
-			5: w_file_name = "weight2_itile0_otile0_kij5.txt";
-			6: w_file_name = "weight2_itile0_otile0_kij6.txt";
-			7: w_file_name = "weight2_itile0_otile0_kij7.txt";
-			8: w_file_name = "weight2_itile0_otile0_kij8.txt";
+			0: w_file_name = "tests/2_16x8/w_i0_o0_kij0.txt";
+			1: w_file_name = "tests/2_16x8/w_i0_o0_kij1.txt";
+			2: w_file_name = "tests/2_16x8/w_i0_o0_kij2.txt";
+			3: w_file_name = "tests/2_16x8/w_i0_o0_kij3.txt";
+			4: w_file_name = "tests/2_16x8/w_i0_o0_kij4.txt";
+			5: w_file_name = "tests/2_16x8/w_i0_o0_kij5.txt";
+			6: w_file_name = "tests/2_16x8/w_i0_o0_kij6.txt";
+			7: w_file_name = "tests/2_16x8/w_i0_o0_kij7.txt";
+			8: w_file_name = "tests/2_16x8/w_i0_o0_kij8.txt";
 		endcase
 		
 
@@ -328,7 +332,7 @@ initial begin
 			#0.5 clk = 1;
 		end
 
-		A_pmem = 11'b00000000000 - (kij % 3 + (kij / 3) * nij_sz);
+		A_pmem = 11'b00000000000 - (kij % 3 + (kij / 3) * nij_sz) ;
 
 
 		for (t=0; t<len_nij; t=t+1) begin  
@@ -392,7 +396,7 @@ initial begin
 		
 
 		CEN_pmem = 0;
-		$display("psum outputs: %0d", t, A_pmem);
+		$display("psum outputs: %0d", t, (((t-4)/onij_sz)*nij_sz + (t-4)%onij_sz));
 		for (j = 0; j < col; j = j + 1) begin
 			$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
 			// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
@@ -408,7 +412,7 @@ initial begin
 	#0.5 clk = 1'b1;
 	
 	CEN_pmem = 1;
-	out_file = $fopen("out2.txt", "r");  
+	out_file = $fopen("tests/2_16x8/out.txt", "r");  
 
 	// Following three lines are to remove the first three comment lines of the file
 	out_scan_file = $fscanf(out_file,"%s", answer); 
@@ -482,6 +486,7 @@ always @ (posedge clk) begin
 	sfp_out_q <= sfp_out;
 	ofifo_valid_q <= ofifo_valid;
 	sel_q <= sel;
+	tile_q <= tile;
 end
 
 

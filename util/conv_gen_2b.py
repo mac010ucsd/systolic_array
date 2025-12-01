@@ -28,13 +28,14 @@ print(f"Input shape: {input_tensor.shape}")
 output = conv(input_tensor)
 print(f"Output shape: {output.shape}") 
 
+prefix = "tests/2_16x8/"
 
 # print(output)
 
 X = torch.flatten(input_tensor, 1,2)
 
 bit_precision = 2
-file = open('activation2_tile0.txt', 'w') #write to file
+file = open(prefix+'act_tile0.txt', 'w') #write to file
 file.write('#time0row15[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
 file.write('#time1row15[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
 file.write('#................#\n')
@@ -60,7 +61,7 @@ W = torch.flatten(conv.weight, 2,3)
 bit_precision = 4
 
 for kij in range(9):
-    file = open(f'weight2_itile0_otile0_kij{kij}.txt', 'w') #write to file
+    file = open(f'{prefix}w_i0_o0_kij{kij}.txt', 'w') #write to file
     file.write('#time0row7[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
     file.write('#time1row7[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
     file.write('#................#\n')
@@ -103,7 +104,7 @@ z = lambda x: ("{0:016b}".format(x) if x >= 0 else "1{0:015b}".format(2**15+x))
 # W = w_tile[tile_id,:,:,kij]  # w_tile[tile_num, array col num, array row num, kij]
 
 bit_precision = 16
-file = open(f'out2.txt', 'w') #write to file
+file = open(f'{prefix}out.txt', 'w') #write to file
 
 file.write('#time0row7[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
 file.write('#time1row7[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
@@ -116,7 +117,6 @@ for j in range(P.size(0)): # per TIMESTEP
         #file.write(' ')  # for visibility with blank between words, you can use
     file.write('\n')
 file.close() #close file   
-
 
 '''
 tensor([[-130, -248, -155, -151, -138, -350,   40,  -77],
@@ -135,5 +135,17 @@ tensor([[-130, -248, -155, -151, -138, -350,   40,  -77],
         [  10, -287,  -61, -162, -343, -329, -131, -148],
         [ -30, -240,  -79, -171, -289, -203,   37,  -64],
         [  67, -113,  -62, -235, -256, -356,  -57, -110]])
+
+
+weights
+tensor([-5, -4,  7,  2, -6, -6, -4, -8,  0, -8,  6,  5, -2, -7, -4,  5])
+tensor([-6,  6, -3, -3, -2, -1, -5,  6,  0, -4, -8,  5, -7, -1,  2, -4])
+tensor([ 0,  3,  5,  5, -2,  6,  5, -6,  4,  0, -3,  4,  4,  2, -4, -2])
+tensor([ 5,  3,  1,  5, -4, -3,  0, -5, -7, -3, -8, -8,  3,  5,  4, -8])
+tensor([-7, -2,  3, -1,  4,  3, -1,  5, -2, -7, -7,  7, -3, -2, -1,  5])
+tensor([ 2, -7,  1, -7,  1, -3, -4, -1, -4, -5,  1,  4, -4, -4, -2,  6])
+tensor([ 0,  1, -4, -6,  5,  5, -4, -1,  7, -7, -6,  5,  1, -8,  5,  6])
+tensor([ 4, -1,  2,  5, -6,  0, -7,  4, -7, -6, -4,  2,  4,  5,  2,  3])
+
 '''
 # print(W.shape)

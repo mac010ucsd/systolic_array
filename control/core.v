@@ -1,5 +1,5 @@
 module core (
-	clk, reset, inst, ofifo_valid, D_xmem, sfp_out, mode, sel
+	clk, reset, inst, ofifo_valid, D_xmem, sfp_out, mode, sel, tile
 );
 
 // core holds 1 sram per act file (nij x rows), 1 (input) sram per weights file (rows x cols), 
@@ -21,6 +21,8 @@ input [b_bw*row-1:0] D_xmem;
 output [psum_bw*col-1:0] sfp_out;
 input mode; // 0: 2-bit mode, 1: 4-bit mode
 input sel; // output sram selector.
+input [1:0] tile;
+
 
 parameter bw = 2;
 parameter b_bw = 4;
@@ -63,6 +65,9 @@ reg sel_qq;
 reg sel_qqq;
 reg [10:0] a_pmem_qq;
 reg [10:0] a_pmem_qqq;
+reg [1:0] tile_q;
+reg [1:0] tile_qq;
+reg [1:0] tile_qqq;
 
 
 reg [31:0] D_xmem_q;
@@ -81,6 +86,7 @@ always @(posedge clk) begin
 		inst_corelet_q <= 0;
 		D_xmem_q    <= 0;
 		sel_q <= 0;
+		tile_q <= 0;
 	end
 	else begin
 		acc_q        <= inst[33];
@@ -104,35 +110,62 @@ always @(posedge clk) begin
 		cen_pmem_qqq <= cen_pmem_qq;
 		a_pmem_qq <= a_pmem_q;
 		a_pmem_qqq <= a_pmem_qq;
+		tile_q <= tile;
+		tile_qq <= tile_q;
+		tile_qqq <= tile_qq;
 	end
 end
 
 wire [psum_bw*col-1:0] sfp_out;
-// wire ofifo_valid;
-// assign ofifo_valid = ofifo_ready;
 reg [4:0] inst_corelet_qq;
 
-corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet_instance (
+/*
+	differences in corelets:
+		- same xmem set (in)
+		- different output pmem set (out)
+		- same ofifo valid time
+		- same ofifo rd time
+		- different o_sram_in
+		- same sfu_en
+		- different INST for l0 write and l0 read?
+		- same exec
+		- different INST for weightload
+*/
+corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet_instance0 (
+	.clk(clk),						// fine
+	.reset(reset),					// fine
+	.in(o_xmem),            		// fine
+	.out(o_corelet0),  				// fine
+	.inst(inst_corelet_qq),			// TODO
+	.ofifo_rd(ofifo_rd_q),			// fine
+	.valid(ofifo_valid),			// fine maybe need to output to different bus
+	.o_sram_in(o_sram_corelet0), 	// fine
+	.sfu_en(acc_q)					// fine
+);
+
+
+corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet_instance1 (
 	.clk(clk),
 	.reset(reset),
 	.in(o_xmem),            
-	.out(o_corelet),      
+	.out(o_corelet1),      
 	.inst(inst_corelet_qq),
 	.ofifo_rd(ofifo_rd_q),
-	.valid(ofifo_valid),
-	.o_sram_in(o_sram_corelet), // fill later
+	.valid(),
+	.o_sram_in(o_sram_corelet1), 
 	.sfu_en(acc_q)
 );
 
 wire [psum_bw*col-1:0] o_corelet;
-// wire ofifo_ready;
+wire [psum_bw*col-1:0] o_corelet0;
+wire [psum_bw*col-1:0] o_corelet1;
 
-
-// nij guaranteed to be larger than # of cols
-// DIN = input data, Q = output data
+// corelet output set TODO
+// corelet instruction set TODO
 
 // xmem: activation memory
 // write to xmem when wen_xmem_q = 0 and cen_xmem_q = 0
+// should be unaffected by tiling
 sram_32b_w2048 sram_x (
 	.CLK(clk),
 	.WEN(wen_xmem_q),
@@ -143,71 +176,75 @@ sram_32b_w2048 sram_x (
 );
 
 wire [31:0] o_xmem;
-wire [psum_bw*col-1:0] o_pmem_even;
-wire [psum_bw*col-1:0] o_pmem_odd;
+wire [psum_bw*col-1:0] o_pmem_even0;
+wire [psum_bw*col-1:0] o_pmem_odd0;
+wire [psum_bw*col-1:0] o_pmem_even1;
+wire [psum_bw*col-1:0] o_pmem_odd1;
 
-wire wen_pmem_even_q;
-wire wen_pmem_odd_q;
+wire wen_pmem_even_qqq;
+wire wen_pmem_odd_qqq;
 
 // need to delay 2 cycles,
 
-assign wen_pmem_even_q = !(!sel_qqq & !wen_pmem_qqq);
-assign wen_pmem_odd_q = !(sel_qqq & !wen_pmem_qqq);
-assign sfp_out = sel_q ? o_pmem_odd : o_pmem_even;
+assign wen_pmem_even_qqq = !(!sel_qqq & !wen_pmem_qqq);
+assign wen_pmem_odd_qqq = !(sel_qqq & !wen_pmem_qqq);
+
+wire [psum_bw*col-1:0] sfp_out0;
+wire [psum_bw*col-1:0] sfp_out1;
+
+
+assign sfp_out0 = (sel_qqq ? o_pmem_odd0 : o_pmem_even0);
+assign sfp_out1 = (sel_qqq ? o_pmem_odd1 : o_pmem_even1);
+
+
+
+assign sfp_out = tile_qqq[0] ? sfp_out0 : sfp_out1;
 
 // acc_q, cen, wen, sel
 // SEL = bank to write to (delay 2 cycles?)
 // !SEL = bank to read from
 
-sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even (
-	.CLK(clk),
-	.WEN(wen_pmem_even_q),
-	.CEN(wen_pmem_even_q ? cen_pmem_q: cen_pmem_qqq),
-	.D(o_corelet),
-	.A(wen_pmem_even_q ? a_pmem_q: a_pmem_qqq),
-	.Q(o_pmem_even)
-);
-
-wire [psum_bw*col-1:0] o_sram_corelet;
+wire [psum_bw*col-1:0] o_sram_corelet0;
+wire [psum_bw*col-1:0] o_sram_corelet1;
 // the "other" bank goes to corelet
-assign o_sram_corelet = sel ? o_pmem_even : o_pmem_odd;
+assign o_sram_corelet0 = sel ? o_pmem_even0 : o_pmem_odd0;
+assign o_sram_corelet1 = sel ? o_pmem_even1 : o_pmem_odd1;
 
-/*
-reg [10:0] a_pmem_qq;
-reg [10:0] a_pmem_qqq;
-reg wen_pmem_q;
-reg wen_pmem_qq;
-*/
-
-// delay write address by 2 when writing.
-
-
-sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd (
-	.CLK(clk),
-	.WEN(wen_pmem_odd_q),
-	.CEN(wen_pmem_odd_q ? cen_pmem_q: cen_pmem_qqq),
-	.D(o_corelet),
-	.A(wen_pmem_odd_q ? a_pmem_q: a_pmem_qqq),
-	.Q(o_pmem_odd)
+// tile 0
+sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even0 (
+	.CLK(clk & tile_qqq[0]),
+	.WEN(wen_pmem_even_qqq),
+	.CEN(wen_pmem_even_qqq ? cen_pmem_q: cen_pmem_qqq),
+	.D(o_corelet0),
+	.A(wen_pmem_even_qqq ? a_pmem_q: a_pmem_qqq),
+	.Q(o_pmem_even0)
 );
 
+sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd0 (
+	.CLK(clk & tile_qqq[0]),
+	.WEN(wen_pmem_odd_qqq),
+	.CEN(wen_pmem_odd_qqq ? cen_pmem_q: cen_pmem_qqq),
+	.D(o_corelet0),
+	.A(wen_pmem_odd_qqq ? a_pmem_q: a_pmem_qqq),
+	.Q(o_pmem_odd0)
+);
 
-// when accumulating,
-// read from one sram bank 							index 0		cycle 0
-// accumulate with ofifo										cycle 1
-// write to the same index in the other bank		index 0		cycle 2
+// tile 1;
+sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even1 (
+	.CLK(clk & tile_qqq[1]),
+	.WEN(wen_pmem_even_qqq),
+	.CEN(wen_pmem_even_qqq ? cen_pmem_q: cen_pmem_qqq),
+	.D(o_corelet1),
+	.A(wen_pmem_even_qqq ? a_pmem_q: a_pmem_qqq),
+	.Q(o_pmem_even1)
+);
 
-// very end
-// OC = 0
-// 324 nijs = 36 (nij) x 9 (kernels)
-/*
-....
-
-OC = 7
-36 nij x 9 kernels
-
-kij = 0 will have nij 0-35
-0 	37 	74 	114 	151 		188 	228 	265 	302
-0 36+1 72+2 108+2+4	144+2+4+1	
-*/
+sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd1 (
+	.CLK(clk & tile_qqq[1]),
+	.WEN(wen_pmem_odd_qqq),
+	.CEN(wen_pmem_odd_qqq ? cen_pmem_q: cen_pmem_qqq),
+	.D(o_corelet1),
+	.A(wen_pmem_odd_qqq ? a_pmem_q: a_pmem_qqq),
+	.Q(o_pmem_odd1)
+);
 endmodule

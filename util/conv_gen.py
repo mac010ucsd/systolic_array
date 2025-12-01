@@ -13,7 +13,7 @@ conv = nn.Conv2d(
     padding=0,         # no padding
     bias=False          # include bias term
 )
-
+prefix = "tests/4_8x8/"
 # Print layer information
 print(f"Conv layer: {conv}")
 print(f"Weight shape: {conv.weight.shape}")  # [out_channels, in_channels, kernel_h, kernel_w]
@@ -37,7 +37,7 @@ nij = 200 # just a random number
 
 
 bit_precision = 4
-file = open('activation_tile0.txt', 'w') #write to file
+file = open(prefix+'act_tile0.txt', 'w') #write to file
 file.write('#time0row7[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
 file.write('#time1row7[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
 file.write('#................#\n')
@@ -67,7 +67,7 @@ W = torch.flatten(conv.weight, 2,3)
 bit_precision = 4
 
 for kij in range(9):
-    file = open(f'weight_itile0_otile0_kij{kij}.txt', 'w') #write to file
+    file = open(f'{prefix}w_i0_o0_kij{kij}.txt', 'w') #write to file
     file.write('#time0row7[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
     file.write('#time1row7[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
     file.write('#................#\n')
@@ -120,7 +120,7 @@ z = lambda x: ("{0:016b}".format(x) if x >= 0 else "1{0:015b}".format(2**15+x))
 # W = w_tile[tile_id,:,:,kij]  # w_tile[tile_num, array col num, array row num, kij]
 
 bit_precision = 16
-file = open(f'out.txt', 'w') #write to file
+file = open(f'{prefix}out.txt', 'w') #write to file
 
 file.write('#time0row7[msb-lsb],time0row6[msb-lst],....,time0row0[msb-lst]#\n')
 file.write('#time1row7[msb-lsb],time1row6[msb-lst],....,time1row0[msb-lst]#\n')
