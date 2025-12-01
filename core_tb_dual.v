@@ -2,7 +2,7 @@
 // Please do not spread this code without permission 
 `timescale 1ns/1ps
 
-module core_tb_2b;
+module core_tb_dual;
 
 parameter bw = 4;
 parameter psum_bw = 16;
@@ -13,6 +13,7 @@ parameter row = 8;
 parameter len_nij = 36; 
 parameter nij_sz = 6;
 parameter onij_sz = 4;
+parameter htiles = 2;
 
 reg clk = 0;
 reg reset = 1;
@@ -46,6 +47,8 @@ reg mode;
 reg mode_q = 0;
 reg sel = 0;
 reg sel_q = 0;
+reg [1:0] tile;
+reg [1:0] tile_q;
 
 reg [1:0]  inst_w; 
 reg [bw*row-1:0] D_xmem;
@@ -98,7 +101,8 @@ core  #(.col(col), .row(row), .psum_bw(psum_bw)) core_instance (
 	.sfp_out(sfp_out), 
 	.mode(mode_q),
 	.reset(reset),
-	.sel(sel_q)); 
+	.sel(sel_q),
+	.tile(tile_q)); 
 
 
 initial begin 
@@ -116,12 +120,13 @@ initial begin
 	execute  = 0;
 	load     = 0;
 	mode	 = 0;
-	acc = 0;
+	acc 	 = 0;
+	tile = 2'b01;
 
-	$dumpfile("core_tb_2b.vcd");
-	$dumpvars(0,core_tb_2b);
+	$dumpfile("core_tb_dual.vcd");
+	$dumpvars(0,core_tb_dual);
 
-	x_file = $fopen("activation2_tile0.txt", "r");
+	x_file = $fopen("tests/2_16x16/act_tile0.txt", "r");
 	// Following three lines are to remove the first three comment lines of the file
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
 	x_scan_file = $fscanf(x_file,"%s", captured_data);
@@ -161,15 +166,15 @@ initial begin
 	for (kij=0; kij<9; kij=kij+1) begin  // kij loop
 		$display(kij);
 		case(kij)
-			0: w_file_name = "weight2_itile0_otile0_kij0.txt";
-			1: w_file_name = "weight2_itile0_otile0_kij1.txt";
-			2: w_file_name = "weight2_itile0_otile0_kij2.txt";
-			3: w_file_name = "weight2_itile0_otile0_kij3.txt";
-			4: w_file_name = "weight2_itile0_otile0_kij4.txt";
-			5: w_file_name = "weight2_itile0_otile0_kij5.txt";
-			6: w_file_name = "weight2_itile0_otile0_kij6.txt";
-			7: w_file_name = "weight2_itile0_otile0_kij7.txt";
-			8: w_file_name = "weight2_itile0_otile0_kij8.txt";
+			0: w_file_name = "tests/2_16x16/w_i0_o0_kij0.txt";
+			1: w_file_name = "tests/2_16x16/w_i0_o0_kij1.txt";
+			2: w_file_name = "tests/2_16x16/w_i0_o0_kij2.txt";
+			3: w_file_name = "tests/2_16x16/w_i0_o0_kij3.txt";
+			4: w_file_name = "tests/2_16x16/w_i0_o0_kij4.txt";
+			5: w_file_name = "tests/2_16x16/w_i0_o0_kij5.txt";
+			6: w_file_name = "tests/2_16x16/w_i0_o0_kij6.txt";
+			7: w_file_name = "tests/2_16x16/w_i0_o0_kij7.txt";
+			8: w_file_name = "tests/2_16x16/w_i0_o0_kij8.txt";
 		endcase
 		
 
@@ -195,78 +200,81 @@ initial begin
 
 		/////// Kernel data writing to memory ///////
 		// must modify for 2b as kernel is twice sized (2col)
-		// TODO: select left/right tile
-		A_xmem = 11'b10000000000;
 
-		for (t=0; t<2*col; t=t+1) begin  
-			#0.5 clk = 1'b0;  w_scan_file = $fscanf(w_file,"%32b", D_xmem); 
-			WEN_xmem = 0; CEN_xmem = 0; if (t>0) A_xmem = A_xmem + 1; 
+		for (j=0; j < htiles; j=j+1) begin
+			A_xmem = 11'b10000000000;
+			tile = (1'b1 << j);
+
+			for (t=0; t<2*col; t=t+1) begin  
+				#0.5 clk = 1'b0;  w_scan_file = $fscanf(w_file,"%32b", D_xmem); 
+				WEN_xmem = 0; CEN_xmem = 0; if (t>0) A_xmem = A_xmem + 1; 
+				#0.5 clk = 1'b1;  
+			end
+
+			#0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0;
+			#0.5 clk = 1'b1; 
+			/////////////////////////////////////
+
+
+			/////// Kernel data writing to L0 ///////
+			// must modify for 2b as kernel is twice sized (2col)
+			A_xmem = 11'b10000000000;
+
+			for (t=0; t<col*2; t=t+1) begin
+				#0.5 clk = 0;
+				l0_wr = 1;
+				CEN_xmem = 0;
+				if (t>0) A_xmem = A_xmem + 1;
+				#0.5 clk = 1;
+			end
+
+			#0.5 clk = 1'b0;  CEN_xmem = 1; l0_wr = 0;
+			#0.5 clk = 1'b1; 
+			/////////////////////////////////////
+			
+
+
+			/////// Kernel loading to PEs ///////
+			// should take roughly 2col+1 to propagate to end
+			// so row+2col+1 to propagate to bottom right corner.
+			// just trust that it works.
+			
+			/////////////////////////////////////
+
+			// only 8 (#col) number of "loads" need to be sent
+			// but it's fine if we send more as they just won't be used.
+			// must modify for 2b as kernel is twice sized (2col)
+			// kernel loading VERIFIED.
+			for (t=0; t<row+col*2; t=t+1) begin
+				#0.5 clk = 0;
+				mode = 0;
+				if (t >= col*2) begin
+					l0_rd = 1;
+					load = 0;
+				end else begin
+					l0_rd = 1;
+					load = 1;
+				end
+				#0.5 clk = 1;
+			end
+
+
+			////// provide some intermission to clear up the kernel loading ///
+			#0.5 clk = 1'b0;  load = 0; l0_rd = 0;
 			#0.5 clk = 1'b1;  
-		end
-
-		#0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0;
-		#0.5 clk = 1'b1; 
-		/////////////////////////////////////
-
-
-
-		/////// Kernel data writing to L0 ///////
-		// must modify for 2b as kernel is twice sized (2col)
-		A_xmem = 11'b10000000000;
-
-		for (t=0; t<col*2; t=t+1) begin
-			#0.5 clk = 0;
-			l0_wr = 1;
-			CEN_xmem = 0;
-			if (t>0) A_xmem = A_xmem + 1;
-			#0.5 clk = 1;
-		end
-
-		#0.5 clk = 1'b0;  CEN_xmem = 1; l0_wr = 0;
-		#0.5 clk = 1'b1; 
-		/////////////////////////////////////
-
-
-
-		/////// Kernel loading to PEs ///////
-		// should take roughly 2col+1 to propagate to end
-		// so row+2col+1 to propagate to bottom right corner.
-		// just trust that it works.
 		
 
-		// only 8 (#col) number of "loads" need to be sent
-		// but it's fine if we send more as they just won't be used.
-		// must modify for 2b as kernel is twice sized (2col)
-		// kernel loading VERIFIED.
-		for (t=0; t<row+col*2; t=t+1) begin
-			#0.5 clk = 0;
-			mode = 0;
-			if (t >= col*2) begin
-				l0_rd = 1;
-				load = 0;
-			end else begin
-				l0_rd = 1;
-				load = 1;
+			for (i=0; i<10 ; i=i+1) begin
+				#0.5 clk = 1'b0;
+				#0.5 clk = 1'b1;  
 			end
-			#0.5 clk = 1;
+			/////////////////////////////////////
 		end
-		/////////////////////////////////////
-
-
-		////// provide some intermission to clear up the kernel loading ///
-		#0.5 clk = 1'b0;  load = 0; l0_rd = 0;
-		#0.5 clk = 1'b1;  
-	
-
-		for (i=0; i<10 ; i=i+1) begin
-			#0.5 clk = 1'b0;
-			#0.5 clk = 1'b1;  
-		end
-		/////////////////////////////////////
 
 
 		/////// Activation data writing to L0 ///////
 		A_xmem = 11'b00000000000;
+		tile = 2'b11;
 
 		// 110 ns - 0.5 here.
 
@@ -329,16 +337,12 @@ initial begin
 			#0.5 clk = 1;
 		end
 
-		A_pmem = 11'b00000000000 - (kij % 3 + (kij / 3) * nij_sz);
+		A_pmem = 11'b00000000000 - (kij % 3 + (kij / 3) * nij_sz) ;
 
 
 		for (t=0; t<len_nij; t=t+1) begin  
 			#0.5 clk = 1'b0; 
-			/* // we don't need to stop ofifo rd as ofifo will automatically stop reading
-			// when empty? or just in accumulate mode?
-			if (t > len_nij-2) //
-				ofifo_rd = 0;
-			*/
+			
 			WEN_pmem = 0; CEN_pmem = 0; 
 			if (t>0) A_pmem = A_pmem + 1; 
 			#0.5 clk = 1'b1;  
@@ -384,6 +388,8 @@ initial begin
 	#0.5 clk = 1'b0;  
 	#0.5 clk = 1'b1;
 	
+	// dump tile0
+	tile = 2'b01;
 	A_pmem = 0;
 	// +4 useless cycles for it to propagate back to our visual 
 	// +1 on the end to make sure terminates
@@ -393,7 +399,7 @@ initial begin
 		
 
 		CEN_pmem = 0;
-		$display("psum outputs: %0d", t, A_pmem);
+		$display("psum outputs: %0d", t, (((t-4)/onij_sz)*nij_sz + (t-4)%onij_sz));
 		for (j = 0; j < col; j = j + 1) begin
 			$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
 			// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
@@ -407,9 +413,49 @@ initial begin
 	#0.5 clk = 1'b1;
 	#0.5 clk = 1'b0;  
 	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	
+	// dump tile1
+	tile = 2'b10;
+	A_pmem = 0;
+	
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	// +4 useless cycles for it to propagate back to our visual 
+	// +1 on the end to make sure terminates
+	for (t=0; t<len_onij+4; t=t+1) begin
+		#0.5 clk = 0;
+		A_pmem = (t/onij_sz)*nij_sz + t%onij_sz;
+		
+
+		CEN_pmem = 0;
+		$display("psum outputs: %0d", t, (((t-4)/onij_sz)*nij_sz + (t-4)%onij_sz));
+		for (j = 0; j < col; j = j + 1) begin
+			$display("out_s[%0d]: %0d", j, $signed(sfp_out_q[j]));
+			// $display("out_s[%0d]: %0d", j, $signed(core_instance.sram_o_even[j]));
+		end
+		$display("-----------------------");
+		#0.5 clk = 1;
+	end
+
+	
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+
+	// 0 tile output has issues...
+
 	
 	CEN_pmem = 1;
-	out_file = $fopen("out2.txt", "r");  
+	out_file = $fopen("tests/2_16x16/out.txt", "r");  
 
 	// Following three lines are to remove the first three comment lines of the file
 	out_scan_file = $fscanf(out_file,"%s", answer); 
@@ -419,21 +465,31 @@ initial begin
 	error = 0;
 
 	$display("############ Verification Start #############"); 
-
+	tile = 2'b00;
 	A_pmem = 0;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
+	#0.5 clk = 1'b0;  
+	#0.5 clk = 1'b1;
 	// +4 useless cycles for it to propagate back to our visual 
-	for (t=0; t<len_onij+4; t=t+1) begin
+	// need to alternate loading 
+	for (t=0; t<(len_onij*htiles)+4; t=t+1) begin
 		#0.5 clk = 0;
-		A_pmem = (t/onij_sz)*nij_sz + t%onij_sz;
-		
-
+		A_pmem = ((t/htiles)/onij_sz)*nij_sz + (t/htiles)%onij_sz;
+		tile = (1'b1 << (t%2)); // load MSB tile first (1) then (0) 
 		CEN_pmem = 0;
 		if (t>=4) begin
 			out_scan_file = $fscanf(out_file,"%128b", answer); // reading from out file to answer
 			if (sfp_out_q == answer)
-				$display("%2d-th output featuremap Data matched! :D %0d", t, A_pmem); 
+				$display("%2d-th output featuremap Data matched! :D idx %0d tile %2b", 
+					(t-4)/htiles, (((t-4)/htiles)/onij_sz)*nij_sz + ((t-4)/htiles)%onij_sz, tile); 
 			else begin
-				$display("%2d-th output featuremap Data ERROR!! %0d", t, A_pmem); 
+				$display("%2d-th output featuremap Data ERROR!! idx %0d tile %2b", (t-4)/htiles, 
+					(((t-4)/htiles)/onij_sz)*nij_sz + ((t-4)/htiles)%onij_sz, tile); 
 				$display("sfpout: %128b", sfp_out_q);
 				$display("answer: %128b", answer);
 				error = 1;
@@ -483,11 +539,8 @@ always @ (posedge clk) begin
 	sfp_out_q <= sfp_out;
 	ofifo_valid_q <= ofifo_valid;
 	sel_q <= sel;
+	tile_q <= tile;
 end
 
 
 endmodule
-
-
-
-

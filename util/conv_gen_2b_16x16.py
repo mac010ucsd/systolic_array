@@ -14,7 +14,7 @@ conv = nn.Conv2d(
     bias=False          # no bias
 )
 
-prefix = "tests/2b_16x16/"
+prefix = "tests/2_16x16/"
 
 # Print layer information
 print(f"Conv layer: {conv}")
@@ -65,7 +65,7 @@ bit_precision = 4
 
 print(W[:,:,0])
 for kij in range(9):
-    file = open(f'{prefix}wgt_itile0_otile0_kij{kij}.txt', 'w') #write to file
+    file = open(f'{prefix}w_i0_o0_kij{kij}.txt', 'w') #write to file
     file.write('#oc0ic14[msb-lsb],oc0ic12[msb-lst],....,oc0ic0[msb-lst]#\n')
     file.write('#oc0ic15[msb-lsb],oc0ic13[msb-lst],....,oc0ic1[msb-lst]#\n')
     file.write('#................#\n')

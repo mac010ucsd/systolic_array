@@ -136,7 +136,7 @@ corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet
 	.reset(reset),					// fine
 	.in(o_xmem),            		// fine
 	.out(o_corelet0),  				// fine
-	.inst(inst_corelet_qq),			// TODO
+	.inst({inst_corelet_qq[4:3] & {2{tile_qq[0]}}, inst_corelet_qq[2:1], inst_corelet_qq[0] & tile_qq[0]}),			// TODO
 	.ofifo_rd(ofifo_rd_q),			// fine
 	.valid(ofifo_valid),			// fine maybe need to output to different bus
 	.o_sram_in(o_sram_corelet0), 	// fine
@@ -149,7 +149,7 @@ corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet
 	.reset(reset),
 	.in(o_xmem),            
 	.out(o_corelet1),      
-	.inst(inst_corelet_qq),
+	.inst({inst_corelet_qq[4:3] & {2{tile_qq[1]}}, inst_corelet_qq[2:1], inst_corelet_qq[0] & tile_qq[1]}),			// TODO
 	.ofifo_rd(ofifo_rd_q),
 	.valid(),
 	.o_sram_in(o_sram_corelet1), 
@@ -198,7 +198,7 @@ assign sfp_out1 = (sel_qqq ? o_pmem_odd1 : o_pmem_even1);
 
 
 
-assign sfp_out = tile_qqq[0] ? sfp_out0 : sfp_out1;
+assign sfp_out = tile_qq[0] ? sfp_out0 : sfp_out1;
 
 // acc_q, cen, wen, sel
 // SEL = bank to write to (delay 2 cycles?)
@@ -212,7 +212,7 @@ assign o_sram_corelet1 = sel ? o_pmem_even1 : o_pmem_odd1;
 
 // tile 0
 sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even0 (
-	.CLK(clk & tile_qqq[0]),
+	.CLK(clk ),
 	.WEN(wen_pmem_even_qqq),
 	.CEN(wen_pmem_even_qqq ? cen_pmem_q: cen_pmem_qqq),
 	.D(o_corelet0),
@@ -221,7 +221,7 @@ sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even0 (
 );
 
 sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd0 (
-	.CLK(clk & tile_qqq[0]),
+	.CLK(clk),
 	.WEN(wen_pmem_odd_qqq),
 	.CEN(wen_pmem_odd_qqq ? cen_pmem_q: cen_pmem_qqq),
 	.D(o_corelet0),
@@ -231,7 +231,7 @@ sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd0 (
 
 // tile 1;
 sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even1 (
-	.CLK(clk & tile_qqq[1]),
+	.CLK(clk),
 	.WEN(wen_pmem_even_qqq),
 	.CEN(wen_pmem_even_qqq ? cen_pmem_q: cen_pmem_qqq),
 	.D(o_corelet1),
@@ -240,7 +240,7 @@ sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even1 (
 );
 
 sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd1 (
-	.CLK(clk & tile_qqq[1]),
+	.CLK(clk),
 	.WEN(wen_pmem_odd_qqq),
 	.CEN(wen_pmem_odd_qqq ? cen_pmem_q: cen_pmem_qqq),
 	.D(o_corelet1),
