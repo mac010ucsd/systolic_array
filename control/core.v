@@ -1,5 +1,5 @@
 module core (
-	clk, reset, inst, ofifo_valid, D_xmem, sfp_out, mode, sel, tile
+	clk, reset, inst, ofifo_valid, D_xmem, sfp_out, mode, sel, tile, relu
 );
 
 // core holds 1 sram per act file (nij x rows), 1 (input) sram per weights file (rows x cols), 
@@ -22,6 +22,7 @@ output [psum_bw*col-1:0] sfp_out;
 input mode; // 0: 2-bit mode, 1: 4-bit mode
 input sel; // output sram selector.
 input [1:0] tile;
+input relu;
 
 
 parameter bw = 2;
@@ -68,10 +69,11 @@ reg [10:0] a_pmem_qqq;
 reg [1:0] tile_q;
 reg [1:0] tile_qq;
 reg [1:0] tile_qqq;
+reg relu_q;
 
 
 reg [31:0] D_xmem_q;
-// no ififo
+// no ififo	
 
 always @(posedge clk) begin
 	if (reset) begin
@@ -87,7 +89,9 @@ always @(posedge clk) begin
 		D_xmem_q    <= 0;
 		sel_q <= 0;
 		tile_q <= 0;
+		relu_q <= 0;
 	end
+
 	else begin
 		acc_q        <= inst[33];
 		cen_pmem_q   <= inst[32];
@@ -113,6 +117,8 @@ always @(posedge clk) begin
 		tile_q <= tile;
 		tile_qq <= tile_q;
 		tile_qqq <= tile_qq;
+		relu_q <= relu;
+		
 	end
 end
 
@@ -132,15 +138,17 @@ reg [4:0] inst_corelet_qq;
 		- different INST for weightload
 */
 corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet_instance0 (
-	.clk(clk),						// fine
-	.reset(reset),					// fine
-	.in(o_xmem),            		// fine
-	.out(o_corelet0),  				// fine
-	.inst({inst_corelet_qq[4:3] & {2{tile_qq[0]}}, inst_corelet_qq[2:1], inst_corelet_qq[0] & tile_qq[0]}),			// TODO
-	.ofifo_rd(ofifo_rd_q),			// fine
-	.valid(ofifo_valid),			// fine maybe need to output to different bus
-	.o_sram_in(o_sram_corelet0), 	// fine
-	.sfu_en(acc_q)					// fine
+	.clk(clk),						
+	.reset(reset),					
+	.in(o_xmem),            		
+	.out(o_corelet0),  				
+	.inst({inst_corelet_qq[4:3] & {2{tile_qq[0]}}, inst_corelet_qq[2:1], inst_corelet_qq[0] & tile_qq[0]}),	
+	.ofifo_rd(ofifo_rd_q),			
+	.valid(ofifo_valid),		
+	.o_sram_in(o_sram_corelet0), 	
+	.sfu_en(acc_q),					
+	.relu(relu_q)
+
 );
 
 
@@ -153,7 +161,9 @@ corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet
 	.ofifo_rd(ofifo_rd_q),
 	.valid(),
 	.o_sram_in(o_sram_corelet1), 
-	.sfu_en(acc_q)
+	.sfu_en(acc_q),
+	.relu(relu_q)
+
 );
 
 wire [psum_bw*col-1:0] o_corelet;

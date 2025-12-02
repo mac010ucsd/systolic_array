@@ -28,6 +28,7 @@ assign o_valid = !rempty;
 wire rempty;
 assign rempty = |empty;
 
+generate
 for (i=0; i<col ; i=i+1) begin : col_num
 	fifo_depth64 #(.bw(bw)) fifo_instance (
 		.rd_clk(clk),
@@ -40,6 +41,7 @@ for (i=0; i<col ; i=i+1) begin : col_num
 		.out(out[(i+1)*bw-1:bw*i]),
 		.reset(reset));
 end
+endgenerate
 
 
 always @ (posedge clk) begin

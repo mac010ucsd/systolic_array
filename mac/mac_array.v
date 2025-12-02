@@ -27,6 +27,7 @@ assign valid[col-1:0] = temp_vld[row*col-1: (row-1)*col]; // last row valid = ar
 assign out_s = temp_psum[(psum_bw*col*(row+1))-1:psum_bw*col*row]; // last row psum output
 
 genvar i;
+generate
 for (i=0; i < row ; i=i+1) begin : row_num
 	mac_row #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col)) mac_row_instance (
 	.clk(clk),
@@ -39,6 +40,7 @@ for (i=0; i < row ; i=i+1) begin : row_num
 	.reset(reset)
 	);
 end
+endgenerate
 
 always @ (posedge clk) begin
 	// inst_w flows to row0 to row7

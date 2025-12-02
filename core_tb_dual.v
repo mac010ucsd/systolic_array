@@ -54,6 +54,9 @@ reg [1:0]  inst_w;
 reg [bw*row-1:0] D_xmem;
 reg [psum_bw*col-1:0] answer;
 
+reg relu;
+reg relu_q;
+
 
 reg ofifo_rd;
 reg ififo_wr;
@@ -109,7 +112,8 @@ core  #(.col(col), .row(row), .psum_bw(psum_bw)) core_instance (
 	.mode(mode_q),
 	.reset(reset),
 	.sel(sel_q),
-	.tile(tile_q)); 
+	.tile(tile_q),
+	.relu(relu)); 
 
 
 initial begin 
@@ -129,6 +133,7 @@ initial begin
 	mode	 = 0;
 	acc 	 = 0;
 	tile = 2'b01;
+	relu = 0;
 
 	$dumpfile("core_tb_dual.vcd");
 	$dumpvars(0,core_tb_dual);
@@ -329,6 +334,9 @@ initial begin
 		sel = kij[0];
 		if (kij > 0)
 			acc = 1;
+		if (kij == 8)
+			relu = 1;
+		
 
 		// we are offsetting A_pmem to align the SFU write to the correct place
 		A_pmem = 11'b00000000000 - (kij % 3 + (kij / 3) * nij_sz) ;
@@ -397,7 +405,6 @@ initial begin
 	#0.5 clk = 1'b0;  
 	#0.5 clk = 1'b1;*/
 	// +4 useless cycles for it to propagate back to our visual 
-	// +1 on the end to make sure terminates
 	for (t=0; t<len_onij+4; t=t+1) begin
 		#0.5 clk = 0;
 		A_pmem = calc_index(t);
@@ -422,7 +429,7 @@ initial begin
 
 	
 	CEN_pmem = 1;
-	out_file = $fopen("tests/2b_vgg/out.txt", "r");  
+	out_file = $fopen("tests/2b_vgg/out_relu.txt", "r");  
 
 	// Following three lines are to remove the first three comment lines of the file
 	out_scan_file = $fscanf(out_file,"%s", answer); 
@@ -492,6 +499,7 @@ always @ (posedge clk) begin
 	ofifo_valid_q <= ofifo_valid;
 	sel_q <= sel;
 	tile_q <= tile;
+	relu_q <= relu;
 end
 
 

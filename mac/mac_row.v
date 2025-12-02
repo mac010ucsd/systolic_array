@@ -41,6 +41,7 @@ mac_tile (clk, reset
 */
 
 genvar i;
+generate
 for (i=0; i < col; i=i+1) begin : col_num
 	mac_tile #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw)) mac_tile_instance (
 		.clk(clk),
@@ -62,5 +63,6 @@ for (i=0; i < col; i=i+1) begin : col_num
 	// valid flag when the dual psum is ready.
 	assign valid[i] = inst[3*(i+2)-2];
 end
+endgenerate
 
 endmodule

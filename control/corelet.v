@@ -3,7 +3,7 @@ corelet.v is just a wrapper that includes all blocks you designed so far (L0/Inp
 FIFO, OFIFO, MAC Array, SFP?).    
 */
 
-module corelet (clk, reset, in, out, inst, valid, ofifo_rd, o_sram_in, sfu_en);
+module corelet (clk, reset, in, out, inst, valid, ofifo_rd, o_sram_in, sfu_en, relu);
 parameter bw = 2;
 parameter b_bw = 4;
 parameter psum_bw = 32;
@@ -18,6 +18,7 @@ output valid;
 input ofifo_rd;
 input [psum_bw*col-1:0] o_sram_in; // o_sram_in for SFU 
 input sfu_en;
+input relu;
 // ofifo_out + o_sram_in -> SFU
 
 wire l0_wr;
@@ -152,7 +153,8 @@ sfu_bank #(.col(col), .psum_bw(psum_bw)) sfu_bank_instance (
 	.psum_in(ofifo_out_q),
 	.psum_mem(o_sram_in),
 	.valid(o_valid_q),
-	.psum_out(sfu_out)
+	.psum_out(sfu_out),
+	.relu(relu)
 );
 
 // sfu enable then sfu_out is output, else use ofifo out
