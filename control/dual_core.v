@@ -1,5 +1,5 @@
-module core (
-	clk, reset, inst, ofifo_valid, D_xmem, sfp_out, mode, sel, relu
+module dual_core (
+	clk, reset, inst, ofifo_valid, D_xmem, sfp_out, mode, sel, tile, relu
 );
 
 // core holds 1 sram per act file (nij x rows), 1 (input) sram per weights file (rows x cols), 
@@ -21,6 +21,7 @@ input [b_bw*row-1:0] D_xmem;
 output [psum_bw*col-1:0] sfp_out;
 input mode; // 0: 2-bit mode, 1: 4-bit mode
 input sel; // output sram selector.
+input [1:0] tile;
 input relu;
 
 
@@ -47,7 +48,6 @@ assign inst_q[2]   = l0_wr_q;           l0 write enable
 assign inst_q[1]   = execute_q;         load and execute activations
 assign inst_q[0]   = load_q;            load weights
 */
-
 reg acc_q;
 reg cen_pmem_q;
 reg wen_pmem_q;
@@ -66,6 +66,9 @@ reg sel_qq;
 reg sel_qqq;
 reg [10:0] a_pmem_qq;
 reg [10:0] a_pmem_qqq;
+reg [1:0] tile_q;
+reg [1:0] tile_qq;
+reg [1:0] tile_qqq;
 reg relu_q;
 
 
@@ -85,6 +88,7 @@ always @(posedge clk) begin
 		inst_corelet_q <= 0;
 		D_xmem_q    <= 0;
 		sel_q <= 0;
+		tile_q <= 0;
 		relu_q <= 0;
 	end
 
@@ -110,6 +114,9 @@ always @(posedge clk) begin
 		cen_pmem_qqq <= cen_pmem_qq;
 		a_pmem_qq <= a_pmem_q;
 		a_pmem_qqq <= a_pmem_qq;
+		tile_q <= tile;
+		tile_qq <= tile_q;
+		tile_qqq <= tile_qq;
 		relu_q <= relu;
 		
 	end
@@ -135,15 +142,33 @@ corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet
 	.reset(reset),					
 	.in(o_xmem),            		
 	.out(o_corelet0),  				
-	.inst(inst_corelet_qq),	
+	.inst({inst_corelet_qq[4:3] & {2{tile_qq[0]}}, inst_corelet_qq[2:1], inst_corelet_qq[0] & tile_qq[0]}),	
 	.ofifo_rd(ofifo_rd_q),			
 	.valid(ofifo_valid),		
 	.o_sram_in(o_sram_corelet0), 	
 	.sfu_en(acc_q),					
 	.relu(relu_q)
+
 );
 
+
+corelet #(.bw(bw), .b_bw(b_bw), .psum_bw(psum_bw), .col(col), .row(row)) corelet_instance1 (
+	.clk(clk),
+	.reset(reset),
+	.in(o_xmem),            
+	.out(o_corelet1),      
+	.inst({inst_corelet_qq[4:3] & {2{tile_qq[1]}}, inst_corelet_qq[2:1], inst_corelet_qq[0] & tile_qq[1]}),			// TODO
+	.ofifo_rd(ofifo_rd_q),
+	.valid(),
+	.o_sram_in(o_sram_corelet1), 
+	.sfu_en(acc_q),
+	.relu(relu_q)
+
+);
+
+wire [psum_bw*col-1:0] o_corelet;
 wire [psum_bw*col-1:0] o_corelet0;
+wire [psum_bw*col-1:0] o_corelet1;
 
 // corelet output set TODO
 // corelet instruction set TODO
@@ -163,6 +188,8 @@ sram_32b_w2048 sram_x (
 wire [31:0] o_xmem;
 wire [psum_bw*col-1:0] o_pmem_even0;
 wire [psum_bw*col-1:0] o_pmem_odd0;
+wire [psum_bw*col-1:0] o_pmem_even1;
+wire [psum_bw*col-1:0] o_pmem_odd1;
 
 wire wen_pmem_even_qqq;
 wire wen_pmem_odd_qqq;
@@ -172,15 +199,26 @@ wire wen_pmem_odd_qqq;
 assign wen_pmem_even_qqq = !(!sel_qqq & !wen_pmem_qqq);
 assign wen_pmem_odd_qqq = !(sel_qqq & !wen_pmem_qqq);
 
-assign sfp_out = sel_q ? o_pmem_odd0 : o_pmem_even0;
+wire [psum_bw*col-1:0] sfp_out0;
+wire [psum_bw*col-1:0] sfp_out1;
+
+
+assign sfp_out0 = (sel_qqq ? o_pmem_odd0 : o_pmem_even0);
+assign sfp_out1 = (sel_qqq ? o_pmem_odd1 : o_pmem_even1);
+
+
+
+assign sfp_out = tile_qq[0] ? sfp_out0 : sfp_out1;
 
 // acc_q, cen, wen, sel
 // SEL = bank to write to (delay 2 cycles?)
 // !SEL = bank to read from
 
 wire [psum_bw*col-1:0] o_sram_corelet0;
+wire [psum_bw*col-1:0] o_sram_corelet1;
 // the "other" bank goes to corelet
 assign o_sram_corelet0 = sel ? o_pmem_even0 : o_pmem_odd0;
+assign o_sram_corelet1 = sel ? o_pmem_even1 : o_pmem_odd1;
 
 // tile 0
 sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even0 (
@@ -201,4 +239,22 @@ sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd0 (
 	.Q(o_pmem_odd0)
 );
 
+// tile 1;
+sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_even1 (
+	.CLK(clk),
+	.WEN(wen_pmem_even_qqq),
+	.CEN(wen_pmem_even_qqq ? cen_pmem_q: cen_pmem_qqq),
+	.D(o_corelet1),
+	.A(wen_pmem_even_qqq ? a_pmem_q: a_pmem_qqq),
+	.Q(o_pmem_even1)
+);
+
+sram_bank_32b_w2048 #(.col(col), .psum_bw(psum_bw)) sram_o_odd1 (
+	.CLK(clk),
+	.WEN(wen_pmem_odd_qqq),
+	.CEN(wen_pmem_odd_qqq ? cen_pmem_q: cen_pmem_qqq),
+	.D(o_corelet1),
+	.A(wen_pmem_odd_qqq ? a_pmem_q: a_pmem_qqq),
+	.Q(o_pmem_odd1)
+);
 endmodule

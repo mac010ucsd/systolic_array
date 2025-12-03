@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+singleTileMode = True
+reluEnable = True
 # Set random seed for reproducibility
 torch.manual_seed(42)
 
@@ -14,7 +16,7 @@ conv = nn.Conv2d(
     bias=False          # no bias
 )
 
-prefix = "tests/2_16x16/"
+prefix = "tests/2_16x8/" if singleTileMode else "tests/2_16x16/"
 
 # Print layer information
 print(f"Conv layer: {conv}")
@@ -69,7 +71,7 @@ for kij in range(9):
     file.write('#oc0ic14[msb-lsb],oc0ic12[msb-lst],....,oc0ic0[msb-lst]#\n')
     file.write('#oc0ic15[msb-lsb],oc0ic13[msb-lst],....,oc0ic1[msb-lst]#\n')
     file.write('#................#\n')
-    for j in range(W.size(0)): # per OC (8) -> 16
+    for j in range(W.size(0)//2 if singleTileMode else W.size(0)): # per OC (8) -> 16
         
         for i in range(1, W.size(1), 2):  # per EVEN IC
             W_bin = z(round(W[j,15-i,kij].item())) # reverse IC
@@ -85,6 +87,8 @@ for kij in range(9):
     file.close() #close file   
 
 P = output.flatten(1,2).T
+if reluEnable:
+    P = nn.ReLU()(P)
 
 print(P.shape)
 
@@ -93,18 +97,19 @@ z = lambda x: ("{0:016b}".format(x) if x >= 0 else "1{0:015b}".format(2**15+x))
 bit_precision = 16
 file = open(f'{prefix}out.txt', 'w') #write to file
 
+# only want oc 7-0 for single tile mode
 file.write('#time0oc7[msb-lsb],time0oc6[msb-lst],....,time0oc0[msb-lst]#\n')
 file.write('#time0oc15[msb-lsb],time0oc14[msb-lst],....,time8oc0[msb-lst]#\n')
 file.write('#................#\n')
 for j in range(P.size(0)): # per TIMESTEP
-    for i in range(P.size(1)):  # per OC/col
+    for i in range(P.size(1)//2 if singleTileMode else P.size(1)):  # per OC/col
         # want to write 7:0
         # then 15:8
         W_bin = z(round(P[j,(7-i) if i < 8 else (15-i+8)].item())) # reverse OC
         for k in range(bit_precision):
             file.write(W_bin[k])        
         
-        if (i == 7):
+        if (i == 7 and not singleTileMode):
             file.write('\n') 
     file.write('\n')
 file.close() #close file 

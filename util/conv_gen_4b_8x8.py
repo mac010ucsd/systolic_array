@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+reluEnable = True
+
+
 # Set random seed for reproducibility
 torch.manual_seed(42)
 
@@ -112,6 +115,8 @@ tensor([[ -841,   108,  -367,  -164,  -677,  -677,  -362,  -425],
 '''
 
 P = output.flatten(1,2).T
+if reluEnable:
+    P = nn.ReLU()(P)
 
 z = lambda x: ("{0:016b}".format(x) if x >= 0 else "1{0:015b}".format(2**15+x))
 
