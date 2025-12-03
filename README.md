@@ -11,8 +11,8 @@
 - [X] core
 - [X] core tb 4 bit act 8x8
 - [X] core tb 2 bit act 16x8
-- [ ] tiling 2 bit act 16x16 
-- [ ] core tb tiling 2 bit act 16x16 
+- [X] tiling 2 bit act 16x16 
+- [X] core tb tiling 2 bit act 16x16 
 
 ## tiling notes
 idea: parallel tiling, instantiate 2 corelets fed by same SRAM that output into 2 separate SRAM sets. 
